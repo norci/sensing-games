@@ -1,0 +1,19 @@
+{
+  "name": "sensing-games",
+  "version": "1.0.0",
+  "description": "体感游戏平台 - 基于MediaPipe Pose的手机浏览器体感游戏",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.22"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "vite": "^5.4.0",
+    "@types/webgl2": "^0.0.12"
+  }
+}
