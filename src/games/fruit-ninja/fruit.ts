@@ -32,7 +32,7 @@ export class Fruit {
   private readonly xMargin: number;
   private readonly yMargin: number;
 
-  constructor(canvasWidth: number, canvasHeight: number) {
+  constructor(canvasWidth: number, canvasHeight: number, speedMultiplier = 1.0) {
     this.canvasWidth = canvasWidth;
     this.canvasHeight = canvasHeight;
     this.xMargin = canvasWidth * 0.15;
@@ -46,9 +46,9 @@ export class Fruit {
     const maxY = canvasHeight - this.yMargin - this.config.radius;
     this.y = maxY;
 
-    // 随机水平速度，向上发射
-    this.vx = randomRange(-2, 2);
-    this.vy = -randomRange(this.config.speed * 0.8, this.config.speed * 1.2);
+    // 随机水平速度，向上发射；speedMultiplier 随难度提高
+    this.vx = randomRange(-2, 2) * speedMultiplier;
+    this.vy = -randomRange(this.config.speed * 0.8, this.config.speed * 1.2) * speedMultiplier;
   }
 
   private randomConfig(): FruitConfig {

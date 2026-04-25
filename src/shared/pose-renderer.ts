@@ -1,4 +1,4 @@
-import { NormalizedLandmark } from '../types/pose.js';
+import { NormalizedLandmark } from '../core/types.js';
 
 // MediaPipe Pose 骨架连接定义（33个关键点）
 const POSE_CONNECTIONS: [number, number][] = [
@@ -36,10 +36,9 @@ export class PoseRenderer {
   render(landmarks: NormalizedLandmark[], canvasWidth: number, canvasHeight: number): void {
     if (!landmarks || landmarks.length === 0) return;
 
-    // 绘制骨架连线
+    // 绘骨架连线
     this.renderConnections(landmarks, canvasWidth, canvasHeight);
-
-    // 绘制关键点
+    // 绘关键点
     this.renderLandmarks(landmarks, canvasWidth, canvasHeight);
   }
 
@@ -109,46 +108,50 @@ export class PoseRenderer {
     }
   }
 
-  // 高亮显示左右手腕（挥刀关键部位）
-  renderWristHighlight(landmarks: NormalizedLandmark[], canvasWidth: number, canvasHeight: number): void {
-    // 高亮左手腕（蓝色）
-    if (landmarks.length >= 16) {
-      const leftWrist = landmarks[15];
-      if (leftWrist && (leftWrist.visibility ?? 0) >= 0.5) {
-        const x = (1 - leftWrist.x) * canvasWidth;
-        const y = leftWrist.y * canvasHeight;
+  // 高亮显示活跃的身体部位
+  renderPartHighlight(landmarks: NormalizedLandmark[], canvasWidth: number, canvasHeight: number): void {
+    const highlights: { idx: number; color: string; label: string; offsetY: number }[] = [
+      { idx: 13, color: '#0096c8', label: 'LE', offsetY: -20 },  // 左手肘
+      { idx: 14, color: '#c86400', label: 'RE', offsetY: 25  },  // 右手肘
+      { idx: 25, color: '#00c896', label: 'LK', offsetY: -20 },  // 左膝
+      { idx: 26, color: '#c83264', label: 'RK', offsetY: 25  },  // 右膝
+      { idx: 27, color: '#00ff64', label: 'LF', offsetY: -25 },  // 左脚踝
+      { idx: 28, color: '#ff64c8', label: 'RF', offsetY: 25  },  // 右脚踝
+    ];
 
-        this.ctx.strokeStyle = '#00ccff';
-        this.ctx.lineWidth = 3;
-        this.ctx.beginPath();
-        this.ctx.arc(x, y, 15, 0, 2 * Math.PI);
-        this.ctx.stroke();
-
-        this.ctx.fillStyle = '#00ccff';
-        this.ctx.font = '12px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText(`L (${leftWrist.x.toFixed(2)}, ${leftWrist.y.toFixed(2)})`, x, y - 25);
-      }
+    // 头球圆圈——直接用鼻尖（landmark 0）
+    if (landmarks[0] && (landmarks[0].visibility ?? 0) >= 0.5) {
+      const hx = (1 - landmarks[0].x) * canvasWidth;
+      const hy = landmarks[0].y * canvasHeight;
+      this.ctx.strokeStyle = '#cc66ff';
+      this.ctx.lineWidth = 3;
+      this.ctx.beginPath();
+      this.ctx.arc(hx, hy, 15, 0, 2 * Math.PI);
+      this.ctx.stroke();
+      this.ctx.fillStyle = '#cc66ff';
+      this.ctx.font = '12px Arial';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText('H', hx, hy - 20);
     }
 
-    // 高亮右手腕（橙色）
-    if (landmarks.length >= 17) {
-      const rightWrist = landmarks[16];
-      if (rightWrist && (rightWrist.visibility ?? 0) >= 0.5) {
-        const x = (1 - rightWrist.x) * canvasWidth;
-        const y = rightWrist.y * canvasHeight;
+    for (const h of highlights) {
+      if (landmarks.length <= h.idx) continue;
+      const lm = landmarks[h.idx];
+      if (!lm || (lm.visibility ?? 0) < 0.5) continue;
 
-        this.ctx.strokeStyle = '#ff6600';
-        this.ctx.lineWidth = 3;
-        this.ctx.beginPath();
-        this.ctx.arc(x, y, 15, 0, 2 * Math.PI);
-        this.ctx.stroke();
+      const x = (1 - lm.x) * canvasWidth;
+      const y = lm.y * canvasHeight;
 
-        this.ctx.fillStyle = '#ff6600';
-        this.ctx.font = '12px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText(`R (${rightWrist.x.toFixed(2)}, ${rightWrist.y.toFixed(2)})`, x, y + 25);
-      }
+      this.ctx.strokeStyle = h.color;
+      this.ctx.lineWidth = 3;
+      this.ctx.beginPath();
+      this.ctx.arc(x, y, 15, 0, 2 * Math.PI);
+      this.ctx.stroke();
+
+      this.ctx.fillStyle = h.color;
+      this.ctx.font = '12px Arial';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText(h.label, x, y + h.offsetY);
     }
   }
 }

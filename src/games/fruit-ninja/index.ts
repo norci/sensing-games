@@ -1,9 +1,9 @@
-import { IGameMode } from '../../types/game.js';
-import { SwingResult } from '../../types/swing.js';
+import { IGameMode, MotionResult, Point } from '../../core/types.js';
 import { Fruit } from './fruit.js';
 import { SlicingSystem } from './slicing.js';
 import { GameEngine } from '../../core/game-engine.js';
-import { SoundManager } from '../../shared/sound-manager.js';
+import { DifficultyManager } from './difficulty-manager.js';
+import { ParticleSystem } from './particle-system.js';
 
 export class FruitNinjaGame implements IGameMode {
   readonly name = 'Fruit Ninja';
@@ -13,12 +13,14 @@ export class FruitNinjaGame implements IGameMode {
   private ctx: CanvasRenderingContext2D | null = null;
   private fruits: Fruit[] = [];
   private slicingSystem: SlicingSystem = new SlicingSystem();
+  private particleSystem: ParticleSystem = new ParticleSystem();
   private gameEngine: GameEngine;
   private lastSpawnTime: number = 0;
-  private spawnInterval = 3000; // ms（已减半，原值1500）
+  private difficultyMgr: DifficultyManager;
 
   constructor(gameEngine: GameEngine) {
     this.gameEngine = gameEngine;
+    this.difficultyMgr = new DifficultyManager();
   }
 
   init(canvas: HTMLCanvasElement, glCanvas?: HTMLCanvasElement): void {
@@ -34,22 +36,21 @@ export class FruitNinjaGame implements IGameMode {
     this.canvas.height = window.innerHeight;
   }
 
-  // 每帧调用：更新水果物理、生成新水果、检测落空
   updatePhysics(): void {
     const now = Date.now();
 
-    // 生成新水果
-    if (now - this.lastSpawnTime > this.spawnInterval) {
-      this.spawnFruit();
-      this.lastSpawnTime = now;
+    // 采样 + 更新难度
+    this.difficultyMgr.sample(this.fruits.length);
+    const difficulty = this.difficultyMgr.update(now);
 
-      // 难度递增（已减半，原值递减50，最小800）
-      if (this.spawnInterval > 1600) {
-        this.spawnInterval -= 25;
-      }
+    const spawnInterval = this.difficultyMgr.getSpawnInterval();
+    const speedMultiplier = this.difficultyMgr.getSpeedMultiplier();
+
+    if (now - this.lastSpawnTime > spawnInterval) {
+      this.spawnFruit(speedMultiplier);
+      this.lastSpawnTime = now;
     }
 
-    // 更新水果位置，检测落空
     for (let i = this.fruits.length - 1; i >= 0; i--) {
       const fruit = this.fruits[i];
       fruit.update();
@@ -63,24 +64,26 @@ export class FruitNinjaGame implements IGameMode {
     }
   }
 
-  // 挥刀时调用：检测切中水果
-  checkSlice(swingResult: SwingResult): void {
+  checkSlice(motionResult: MotionResult): void {
     if (!this.canvas) return;
 
     for (let i = this.fruits.length - 1; i >= 0; i--) {
       const fruit = this.fruits[i];
 
-      if (this.slicingSystem.checkSlice(fruit, swingResult, this.canvas.width, this.canvas.height)) {
+      if (this.slicingSystem.checkSlice(fruit, motionResult, this.canvas.width, this.canvas.height)) {
         fruit.slice();
 
         if (fruit.isBomb()) {
           this.gameEngine.loseLife();
+          // 炸弹爆出白色粒子（加倍）
+          this.particleSystem.emit(fruit.x, fruit.y, '#FFFFFF', { count: 24 });
         } else {
-          // 切中水果才算：加分、连击、音效、显示"斩！"
           this.gameEngine.onFruitSliced(
             { x: fruit.x, y: fruit.y },
             fruit.getPoints()
           );
+          // 水果爆出对应颜色的粒子
+          this.particleSystem.emit(fruit.x, fruit.y, fruit.config.color);
         }
 
         this.fruits.splice(i, 1);
@@ -88,13 +91,13 @@ export class FruitNinjaGame implements IGameMode {
     }
   }
 
-  update(swingResult: SwingResult): void {
+  update(motionResult: MotionResult): void {
     this.updatePhysics();
-    this.slicingSystem.update();
+    this.particleSystem.update();
 
-    if (swingResult.isBigSwing) {
-      this.checkSlice(swingResult);
-      this.slicingSystem.updateTrail(swingResult, this.canvas!.width, this.canvas!.height);
+    if (motionResult.isBigSwing) {
+      this.checkSlice(motionResult);
+      this.slicingSystem.updateTrail(motionResult, this.canvas!.width, this.canvas!.height);
     }
   }
 
@@ -102,15 +105,13 @@ export class FruitNinjaGame implements IGameMode {
     const context = ctx || this.ctx;
     if (!context || !this.canvas) return;
 
-    // 清空画布
     context.fillStyle = 'rgba(0, 0, 0, 0.2)';
     context.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // 绘制背景
     context.fillStyle = '#1a1a2e';
     context.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // 绘制 70% 区域边框（提示目标生成范围）
+    // 绘制 70% 区域边框
     const borderMarginX = this.canvas.width * 0.15;
     const borderMarginY = this.canvas.height * 0.15;
     context.strokeStyle = 'rgba(255, 255, 255, 0.12)';
@@ -124,19 +125,16 @@ export class FruitNinjaGame implements IGameMode {
     );
     context.setLineDash([]);
 
-    // 绘制水果
     this.fruits.forEach(fruit => fruit.render(context));
-
-    // 绘制刀光轨迹
+    // 轨迹线宽 1px（视觉辅助，主料是火花特效）
     this.slicingSystem.renderTrail(context);
-
-    // 绘制UI
+    this.particleSystem.render(context);
     this.renderHUD(context);
   }
 
-  private spawnFruit(): void {
+  private spawnFruit(speedMultiplier: number): void {
     if (!this.canvas) return;
-    const fruit = new Fruit(this.canvas.width, this.canvas.height);
+    const fruit = new Fruit(this.canvas.width, this.canvas.height, speedMultiplier);
     this.fruits.push(fruit);
   }
 
@@ -145,13 +143,11 @@ export class FruitNinjaGame implements IGameMode {
     const w = this.canvas.width;
     const h = this.canvas.height;
 
-    // 计分
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 24px Arial';
     ctx.textAlign = 'left';
     ctx.fillText(`Score: ${this.gameEngine.getScore()}`, 20, 40);
 
-    // 连击
     if (this.gameEngine.getCombo() > 1) {
       ctx.fillStyle = '#ffd700';
       ctx.font = 'bold 32px Arial';
@@ -159,7 +155,6 @@ export class FruitNinjaGame implements IGameMode {
       ctx.fillText(`COMBO x${this.gameEngine.getCombo()}`, w / 2, 50);
     }
 
-    // 生命值
     ctx.fillStyle = '#ff0000';
     ctx.font = 'bold 24px Arial';
     ctx.textAlign = 'right';
@@ -171,5 +166,14 @@ export class FruitNinjaGame implements IGameMode {
   destroy(): void {
     this.fruits = [];
     this.slicingSystem.reset();
+    this.particleSystem.reset();
+  }
+
+  restart(): void {
+    this.fruits = [];
+    this.slicingSystem.reset();
+    this.particleSystem.reset();
+    this.difficultyMgr.reset();
+    this.lastSpawnTime = 0;
   }
 }

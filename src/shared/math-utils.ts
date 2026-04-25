@@ -71,3 +71,26 @@ export function randomRange(min: number, max: number): number {
 export function randomInt(min: number, max: number): number {
   return Math.floor(randomRange(min, max + 1));
 }
+
+// 计算点到线段的距离
+export function pointToLineDistance(
+  point: Point,
+  lineStart: Point,
+  lineEnd: Point
+): number {
+  const dx = lineEnd.x - lineStart.x;
+  const dy = lineEnd.y - lineStart.y;
+  const lenSq = dx * dx + dy * dy;
+  
+  if (lenSq === 0) return distance(point, lineStart);  // 线段退化为点
+  
+  // 计算投影参数 t（线段上的位置）
+  let t = ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));  // 钳制到 [0,1]
+  
+  // 计算投影点
+  const projX = lineStart.x + t * dx;
+  const projY = lineStart.y + t * dy;
+  
+  return Math.sqrt((point.x - projX) ** 2 + (point.y - projY) ** 2);
+}

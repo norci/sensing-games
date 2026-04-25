@@ -1,143 +1,169 @@
 import { Fruit } from './fruit.js';
-import { SwingResult, SwingHandResult } from '../../types/swing.js';
-import { lineCircleIntersect, Point } from '../../shared/math-utils.js';
+import { MotionResult, BodyPartResult, BodyPartId } from '../../core/types.js';
+import { lineCircleIntersect, pointToLineDistance, Point } from '../../shared/math-utils.js';
 
-interface HandSliceState {
-  lastWristPos: Point | null;
-  sliceTrail: Point[];
+/** 带时间戳的轨迹点 */
+interface TrailPoint {
+  x: number;
+  y: number;
+  createdAt: number;  // 创建时间戳（ms）
+}
+
+interface PartSliceState {
+  sliceTrail: TrailPoint[];
   isSwinging: boolean;
 }
 
-export class SlicingSystem {
-  private leftHand: HandSliceState = { lastWristPos: null, sliceTrail: [], isSwinging: false };
-  private rightHand: HandSliceState = { lastWristPos: null, sliceTrail: [], isSwinging: false };
-  private readonly TRAIL_LENGTH = 10;
+/** 每个身体部位的轨迹颜色 */
+const TRAIL_COLORS: Record<string, { prefix: string; hex: string }> = {
+  head:       { prefix: 'rgba(180, 100, 255, ', hex: '#b464ff' },
+  leftHand:  { prefix: 'rgba(0, 200, 255, ',   hex: '#00ccff' },
+  rightHand: { prefix: 'rgba(255, 150, 0, ',   hex: '#ff6600' },
+  leftFoot:  { prefix: 'rgba(0, 255, 100, ',   hex: '#00ff64' },
+  rightFoot: { prefix: 'rgba(255, 100, 200, ', hex: '#ff64c8' },
+  leftElbow:  { prefix: 'rgba(0, 150, 200, ',   hex: '#0096c8' },
+  rightElbow: { prefix: 'rgba(200, 100, 0, ',   hex: '#c86400' },
+  leftKnee:   { prefix: 'rgba(0, 200, 150, ',   hex: '#00c896' },
+  rightKnee:  { prefix: 'rgba(200, 50, 100, ',  hex: '#c83264' },
+};
 
-  // 在挥刀过程中持续更新双手轨迹
-  updateTrail(swingResult: SwingResult, canvasWidth: number, canvasHeight: number): void {
-    // 更新左手轨迹
-    if (swingResult.leftHand) {
-      this.updateHandTrail(this.leftHand, swingResult.leftHand, canvasWidth, canvasHeight);
-    }
-    // 更新右手轨迹
-    if (swingResult.rightHand) {
-      this.updateHandTrail(this.rightHand, swingResult.rightHand, canvasWidth, canvasHeight);
+export class SlicingSystem {
+  private trails: Map<string, PartSliceState> = new Map();
+
+  // 在动作过程中持续更新轨迹（不论速率，始终画轨迹）
+  updateTrail(motionResult: MotionResult, canvasWidth: number, canvasHeight: number): void {
+    for (const [id, part] of Object.entries(motionResult.parts)) {
+      if (part.detected) {  // 不论速率，始终更新轨迹
+        const state = this.getOrCreateState(id);
+        this.updatePartTrail(state, part, canvasWidth, canvasHeight);
+      }
     }
   }
 
-  private updateHandTrail(
-    hand: HandSliceState,
-    handResult: SwingHandResult,
+  private updatePartTrail(
+    state: PartSliceState,
+    part: BodyPartResult,
     canvasWidth: number,
     canvasHeight: number
   ): void {
+    const now = performance.now();
     const currentPos: Point = {
-      x: (1 - handResult.wristPos.x) * canvasWidth,
-      y: handResult.wristPos.y * canvasHeight
+      x: (1 - part.position.x) * canvasWidth,
+      y: part.position.y * canvasHeight
     };
 
-    // 检测位置跳跃：如果上次位置距离过远（手从画面外回来），重置轨迹
-    if (hand.lastWristPos) {
-      const dx = currentPos.x - hand.lastWristPos.x;
-      const dy = currentPos.y - hand.lastWristPos.y;
+    // 用 trail 末点作前位
+    if (state.sliceTrail.length > 0) {
+      const lastPoint = state.sliceTrail[state.sliceTrail.length - 1];
+      const dx = currentPos.x - lastPoint.x;
+      const dy = currentPos.y - lastPoint.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      // 距离超过画布对角线的一半视为跳跃
-      const maxDist = Math.sqrt(canvasWidth * canvasWidth + canvasHeight * canvasHeight) * 0.5;
-      if (dist > maxDist) {
-        hand.sliceTrail = [];
-        hand.lastWristPos = null;
+	// 每 n 像素补一点（减密度，防卡顿）
+      const step = 30;
+      if (dist > step) {
+        const steps = Math.floor(dist / step);
+        for (let i = 1; i <= steps; i++) {
+          const t = i / (steps + 1);
+          state.sliceTrail.push({
+            x: lastPoint.x + dx * t,
+            y: lastPoint.y + dy * t,
+            createdAt: now,  // 插值点也带时间戳
+          });
+        }
       }
     }
 
-    hand.sliceTrail.push(currentPos);
-    if (hand.sliceTrail.length > this.TRAIL_LENGTH) {
-      hand.sliceTrail.shift();
-    }
-    hand.lastWristPos = currentPos;
-    hand.isSwinging = true;
+    state.sliceTrail.push({ ...currentPos, createdAt: now });
+    // 轨迹长度由 TRAIL_FADE_TIME 控制（renderPartTrail 中去除超时点）
+    state.isSwinging = true;
   }
 
-  // 每帧调用：更新轨迹状态，挥刀结束后轨迹逐渐消失
-  update(): void {
-    this.updateHandState(this.leftHand);
-    this.updateHandState(this.rightHand);
-  }
-
-  private updateHandState(hand: HandSliceState): void {
-    if (!hand.isSwinging && hand.sliceTrail.length > 0) {
-      hand.sliceTrail.shift();
-      if (hand.sliceTrail.length > 0) {
-        hand.sliceTrail.shift();
+  // 检测切割
+  checkSlice(fruit: Fruit, motionResult: MotionResult, canvasWidth: number, canvasHeight: number): boolean {
+    for (const [id, part] of Object.entries(motionResult.parts)) {
+      if (part && part.isBigSwing) {
+        const state = this.trails.get(id);
+        if (state && this.checkPartSlice(state, fruit)) return true;
       }
-    }
-    hand.isSwinging = false;
-  }
-
-  // 检测双手切割
-  checkSlice(fruit: Fruit, swingResult: SwingResult, canvasWidth: number, canvasHeight: number): boolean {
-    // 检查左手
-    if (swingResult.leftHand?.isBigSwing) {
-      if (this.checkHandSlice(this.leftHand, fruit, canvasWidth, canvasHeight)) return true;
-    }
-    // 检查右手
-    if (swingResult.rightHand?.isBigSwing) {
-      if (this.checkHandSlice(this.rightHand, fruit, canvasWidth, canvasHeight)) return true;
     }
     return false;
   }
 
-  private checkHandSlice(
-    hand: HandSliceState,
-    fruit: Fruit,
-    canvasWidth: number,
-    canvasHeight: number
+  private checkPartSlice(
+    state: PartSliceState,
+    fruit: Fruit
   ): boolean {
-    if (!hand.lastWristPos) return false;
+    if (state.sliceTrail.length < 2) return false;
 
     const fruitCircle = fruit.getCircle();
-    // 使用轨迹中所有最近的点段进行碰撞检测
-    for (let i = 1; i < hand.sliceTrail.length; i++) {
+    const thickness = 15; // 线段厚度（像素），适配快速移动
+
+    for (let i = 1; i < state.sliceTrail.length; i++) {
       const isSliced = lineCircleIntersect(
-        hand.sliceTrail[i - 1],
-        hand.sliceTrail[i],
+        state.sliceTrail[i - 1],
+        state.sliceTrail[i],
         fruitCircle
       );
       if (isSliced) return true;
+
+      // 加粗检测：水果圆心到线段的距离 <= 圆半径 + 厚度
+      const dist = pointToLineDistance(
+        { x: fruitCircle.x, y: fruitCircle.y },
+        state.sliceTrail[i - 1],
+        state.sliceTrail[i]
+      );
+      if (dist <= fruitCircle.radius + thickness) return true;
     }
     return false;
   }
 
   renderTrail(ctx: CanvasRenderingContext2D): void {
-    // 渲染左手轨迹（蓝色）
-    this.renderHandTrail(ctx, this.leftHand, 'rgba(0, 200, 255, ', '#00ccff');
-    // 渲染右手轨迹（橙色）
-    this.renderHandTrail(ctx, this.rightHand, 'rgba(255, 150, 0, ', '#ff6600');
+    for (const [id, state] of this.trails.entries()) {
+      const colors = TRAIL_COLORS[id] || { prefix: 'rgba(255, 255, 255, ', hex: '#ffffff' };
+      this.renderPartTrail(ctx, state, colors.prefix);
+    }
   }
 
-  private renderHandTrail(
-    ctx: CanvasRenderingContext2D,
-    hand: HandSliceState,
-    colorPrefix: string,
-    debugColor: string
-  ): void {
-    if (hand.sliceTrail.length < 2) return;
+  private readonly TRAIL_FADE_TIME = 500; // 轨迹淡化时间（ms）
 
-    for (let i = 1; i < hand.sliceTrail.length; i++) {
-      const alpha = i / hand.sliceTrail.length;
-      const lineWidth = alpha * 8;
+  private renderPartTrail(
+    ctx: CanvasRenderingContext2D,
+    state: PartSliceState,
+    colorPrefix: string
+  ): void {
+    if (state.sliceTrail.length < 2) return;
+
+    const now = performance.now();
+
+    if (state.sliceTrail.length > 100) {
+      const cutoff = now - this.TRAIL_FADE_TIME;
+      state.sliceTrail = state.sliceTrail.filter(p => p.createdAt >= cutoff);
+    }
+
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+
+    for (let i = 1; i < state.sliceTrail.length; i++) {
+      const prevPoint = state.sliceTrail[i - 1];
+      const age = now - prevPoint.createdAt;
+      const alpha = Math.max(0, 1 - age / this.TRAIL_FADE_TIME);
 
       ctx.beginPath();
-      ctx.moveTo(hand.sliceTrail[i - 1].x, hand.sliceTrail[i - 1].y);
-      ctx.lineTo(hand.sliceTrail[i].x, hand.sliceTrail[i].y);
+      ctx.moveTo(prevPoint.x, prevPoint.y);
+      ctx.lineTo(state.sliceTrail[i].x, state.sliceTrail[i].y);
       ctx.strokeStyle = `${colorPrefix}${alpha})`;
-      ctx.lineWidth = lineWidth;
-      ctx.lineCap = 'round';
       ctx.stroke();
     }
   }
 
+  private getOrCreateState(id: string): PartSliceState {
+    if (!this.trails.has(id)) {
+      this.trails.set(id, { sliceTrail: [], isSwinging: false });
+    }
+    return this.trails.get(id)!;
+  }
+
   reset(): void {
-    this.leftHand = { lastWristPos: null, sliceTrail: [], isSwinging: false };
-    this.rightHand = { lastWristPos: null, sliceTrail: [], isSwinging: false };
+    this.trails.clear();
   }
 }

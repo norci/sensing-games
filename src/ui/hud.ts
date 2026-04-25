@@ -1,5 +1,5 @@
 import { GameEngine, GameState } from '../core/game-engine.js';
-import { SwingResult } from '../types/swing.js';
+import { MotionResult } from '../core/types.js';
 
 export class HUD {
   private canvas: HTMLCanvasElement;
@@ -10,16 +10,36 @@ export class HUD {
     this.ctx = canvas.getContext('2d')!;
   }
 
-  render(gameEngine: GameEngine, swingResult?: SwingResult): void {
+  render(gameEngine: GameEngine, motionResult?: MotionResult): void {
     const state = gameEngine.getState();
 
     if (state === GameState.IDLE) {
       this.renderWelcome();
+    } else if (state === GameState.PAUSED) {
+      this.renderPaused();
     } else if (state === GameState.PLAYING) {
-      this.renderPlaying(gameEngine, swingResult);
+      this.renderPlaying(gameEngine);
     } else if (state === GameState.GAME_OVER) {
       this.renderGameOver(gameEngine);
     }
+  }
+
+  private renderPaused(): void {
+    const ctx = this.ctx;
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.fillStyle = '#ffcc00';
+    ctx.font = 'bold 36px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂停', w / 2, h / 2 - 20);
+
+    ctx.fillStyle = '#cccccc';
+    ctx.font = '20px Arial';
+    ctx.fillText('未检测到人体，请站到摄像头前', w / 2, h / 2 + 20);
   }
 
   private renderWelcome(): void {
@@ -41,13 +61,12 @@ export class HUD {
     ctx.fillText('请用右手大幅度挥刀开始游戏', w / 2, h / 2 + 40);
   }
 
-  private renderPlaying(gameEngine: GameEngine, swingResult?: SwingResult): void {
-    // 只在切中水果时显示"斩！"（300ms 内）
+  private renderPlaying(gameEngine: GameEngine): void {
     const sliceInfo = gameEngine.getLastSliceInfo();
     const timeSinceSlice = Date.now() - sliceInfo.time;
     if (sliceInfo.time > 0 && timeSinceSlice < 300) {
       const ctx = this.ctx;
-      const alpha = 1 - timeSinceSlice / 300; // 渐隐效果
+      const alpha = 1 - timeSinceSlice / 300;
       ctx.fillStyle = `rgba(0, 255, 136, ${alpha})`;
       ctx.font = 'bold 36px Arial';
       ctx.textAlign = 'center';

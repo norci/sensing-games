@@ -1,4 +1,4 @@
-import { IGameMode } from '../types/game.js';
+import { IGameMode } from '../core/types.js';
 import { FruitNinjaGame } from './fruit-ninja/index.js';
 
 export type { IGameMode };

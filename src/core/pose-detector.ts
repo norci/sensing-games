@@ -7,6 +7,12 @@ export interface PoseDetectorConfig {
   delegate?: 'CPU' | 'GPU';
   runningMode?: 'IMAGE' | 'VIDEO' | 'LIVE_STREAM';
   numPoses?: number;
+  /**
+   * 是否输出世界坐标系 landmark（单位：米，原点在髋中心）
+   * 注意：根据 MediaPipe 类型定义，worldLandmarks 始终包含在结果中，
+   * 此配置项仅用于内部标记，不影响 API 调用
+   */
+  outputWorldLandmarks?: boolean;
 }
 
 export class PoseDetector {
@@ -23,6 +29,7 @@ export class PoseDetector {
       delegate: this.isMobile() ? 'CPU' : 'GPU',
       runningMode: 'VIDEO',
       numPoses: 1,
+      outputWorldLandmarks: true, // 标记：世界坐标系始终启用（MediaPipe 默认输出）
       ...config
     };
   }
@@ -42,7 +49,8 @@ export class PoseDetector {
         },
         runningMode: 'VIDEO',
         numPoses: this.config.numPoses!,
-        outputSegmentationMasks: false
+        outputSegmentationMasks: false,
+        // 注意：MediaPipe PoseLandmarker 默认输出 worldLandmarks，无需额外配置
       });
 
       this.isInitialized = true;

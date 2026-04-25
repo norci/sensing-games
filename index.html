@@ -4,6 +4,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>体感水果忍者</title>
+  <!-- 修复部分安卓浏览器 navigator.mediaDevices 为 undefined 的问题 -->
+  <script>
+    (function () {
+      if (!navigator.mediaDevices) navigator.mediaDevices = {};
+      if (navigator.mediaDevices.getUserMedia) return;
+      var legacy = navigator.getUserMedia ||
+                  navigator.webkitGetUserMedia ||
+                  navigator.mozGetUserMedia ||
+                  navigator.msGetUserMedia;
+      navigator.mediaDevices.getUserMedia = legacy
+        ? function (constraints) {
+            return new Promise(function (resolve, reject) {
+              legacy.call(navigator, constraints, resolve, reject);
+            });
+          }
+        : function () {
+            return Promise.reject(new Error('浏览器不支持摄像头'));
+          };
+    })();
+  </script>
   <style>
     * {
       margin: 0;
@@ -119,19 +139,11 @@
       margin-top: 20px;
     }
 
-    #status {
-      position: absolute;
-      bottom: 10px;
-      left: 10px;
-      font-size: 12px;
-      color: #666;
-      z-index: 20;
-    }
-  </style>
+   </style>
 </head>
 <body>
   <div id="container">
-    <video id="video" autoplay playsinline muted></video>
+    <video id="video" autoplay playsinline muted webkit-playsinline></video>
     <canvas id="gameCanvas"></canvas>
     <canvas id="webglCanvas"></canvas>
 
@@ -152,7 +164,6 @@
       <button id="enableCamera">启用摄像头</button>
     </div>
 
-    <div id="status"></div>
   </div>
 
   <script type="module" src="/src/main.ts"></script>
