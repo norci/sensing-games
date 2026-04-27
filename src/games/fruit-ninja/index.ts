@@ -2,8 +2,8 @@ import { IGameMode, MotionResult, Point } from '../../core/types.js';
 import { Fruit } from './fruit.js';
 import { SlicingSystem } from './slicing.js';
 import { GameEngine } from '../../core/game-engine.js';
-import { DifficultyManager } from './difficulty-manager.js';
-import { ParticleSystem } from './particle-system.js';
+import { DifficultyManager } from '../../core/difficulty-manager.js';
+import { FragmentParticleSystem } from '../../core/particle-system.js';
 
 export class FruitNinjaGame implements IGameMode {
   readonly name = 'Fruit Ninja';
@@ -13,7 +13,7 @@ export class FruitNinjaGame implements IGameMode {
   private ctx: CanvasRenderingContext2D | null = null;
   private fruits: Fruit[] = [];
   private slicingSystem: SlicingSystem = new SlicingSystem();
-  private particleSystem: ParticleSystem = new ParticleSystem();
+  private particleSystem: FragmentParticleSystem = new FragmentParticleSystem();
   private gameEngine: GameEngine;
   private lastSpawnTime: number = 0;
   private difficultyMgr: DifficultyManager;
@@ -70,7 +70,7 @@ export class FruitNinjaGame implements IGameMode {
     for (let i = this.fruits.length - 1; i >= 0; i--) {
       const fruit = this.fruits[i];
 
-      if (this.slicingSystem.checkSlice(fruit, motionResult, this.canvas.width, this.canvas.height)) {
+      if (this.slicingSystem.checkSlice(fruit, motionResult)) {
         fruit.slice();
 
         if (fruit.isBomb()) {

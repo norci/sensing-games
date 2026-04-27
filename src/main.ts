@@ -4,11 +4,11 @@ import { GameEngine, GameState } from './core/game-engine.js';
 import { CameraManager } from './core/camera-manager.js';
 import { GameLoop } from './core/game-loop.js';
 import { getGameMode, IGameMode } from './games/index.js';
-import { HUD } from './ui/hud.js';
+import { HUD, HUDConfig } from './ui/hud.js';
 import { DEFAULT_BODY_CONFIGS } from './core/types.js';
 import { PoseRenderer } from './shared/pose-renderer.js';
 import { LandmarkFilter } from './core/landmark-filter.js';
-import { SparkEffect } from './core/spark-effect.js';
+import { SparkEffect } from './core/particle-system.js';
 
 class GameApp {
   // 核心模块
@@ -44,7 +44,29 @@ class GameApp {
     this.engine = new GameEngine({ practiceMode: true });
     this.game = getGameMode('fruit-ninja', this.engine)!;
     this.gameCanvas = gameCanvas;
-    this.hud = new HUD(gameCanvas);
+    const hudConfig: HUDConfig = {
+      title: '体感水果忍者',
+      welcomeSubtitle: '挥动单刀切水果，避开炸弹！',
+      welcomePrompt: '请用右手大幅度挥刀开始游戏',
+      pausedText: '暂停',
+      pausedPrompt: '未检测到人体，请站到摄像头前',
+      gameOverTitle: '游戏结束',
+      scorePrefix: '最终得分: ',
+      restartPrompt: '5秒后重新开始...',
+    };
+    this.hud = new HUD(gameCanvas, hudConfig);
+    // 自定义 Playing 渲染：显示「斩！」特效
+    this.hud.setCustomRender((ctx, engine) => {
+      const sliceInfo = engine.getLastSliceInfo();
+      const timeSinceSlice = Date.now() - sliceInfo.time;
+      if (sliceInfo.time > 0 && timeSinceSlice < 300) {
+        const alpha = 1 - timeSinceSlice / 300;
+        ctx.fillStyle = `rgba(0, 255, 136, ${alpha})`;
+        ctx.font = 'bold 36px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('斩！', sliceInfo.pos.x, sliceInfo.pos.y - 30);
+      }
+    });
     this.poseRenderer = new PoseRenderer(gameCanvas.getContext('2d')!);
     this.gameLoop = new GameLoop();
 
