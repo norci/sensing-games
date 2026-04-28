@@ -9,6 +9,7 @@ import { DEFAULT_BODY_CONFIGS } from './core/types.js';
 import { PoseRenderer } from './shared/pose-renderer.js';
 import { LandmarkFilter } from './core/landmark-filter.js';
 import { SparkEffect } from './core/particle-system.js';
+import { PersonPresenceMonitor } from './core/presence-monitor.js';
 
 class GameApp {
   // 核心模块
@@ -20,27 +21,21 @@ class GameApp {
   private hud: HUD;
   private poseRenderer: PoseRenderer;
   private gameLoop: GameLoop;
-  private gameCanvas: HTMLCanvasElement;  // 存之，以便取 ctx
+  private gameCanvas: HTMLCanvasElement;
+  private presenceMonitor: PersonPresenceMonitor;
 
   // 状态
   private latestFiltered: any[] | null = null;
-  private prevFiltered: any[] | null = null;  // 前帧归一化坐标，用于算方向
+  private prevFiltered: any[] | null = null;
   private partConfigs: typeof DEFAULT_BODY_CONFIGS;
   private landmarkFilter: LandmarkFilter;
   private sparkEffect: SparkEffect;
-  private hasEverDetected = false;   // 是否已成功检测到人（之后暂停方生效）
-  private noPersonTimer = 0;     // 连续检测不到人的计时器（ms）
-  private readonly PAUSE_DELAY = 1000; // 连续 3 秒检测不到人方暂停
-  private isPausedLowFps = false; // 是否已因无人而暂停并降帧
-  private lastSlowCheck = 0;     // 节流状态下上次检测时间
+  private hasEverDetected = false;
 
   constructor() {
     const video = document.getElementById('video') as HTMLVideoElement;
     const gameCanvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
     const webglCanvas = document.getElementById('webglCanvas') as HTMLCanvasElement;
-    const loading = document.getElementById('loading')!;
-    const error = document.getElementById('error')!;
-    const errorMessage = document.getElementById('errorMessage')!;
 
     this.cameraMgr = new CameraManager('video', 'cameraPrompt');
     this.detector = new PoseDetector();
@@ -60,7 +55,6 @@ class GameApp {
       restartPrompt: '5秒后重新开始...',
     };
     this.hud = new HUD(gameCanvas, hudConfig);
-    // 自定义 Playing 渲染：显示「斩！」特效
     this.hud.setCustomRender((ctx, engine) => {
       const sliceInfo = engine.getLastSliceInfo();
       const timeSinceSlice = Date.now() - sliceInfo.time;
@@ -75,25 +69,37 @@ class GameApp {
     this.poseRenderer = new PoseRenderer(gameCanvas.getContext('2d')!);
     this.gameLoop = new GameLoop();
 
-    // 初始化滤波器
     this.landmarkFilter = new LandmarkFilter(this.partConfigs);
     this.sparkEffect = new SparkEffect();
 
-    // 设置游戏模式（wiring）
+    this.presenceMonitor = new PersonPresenceMonitor({
+      delayMs: 3000,
+      callbacks: {
+        onAbsent: () => this.engine.pause(),
+        onPresent: () => {
+          this.engine.resume();
+          if (!this.hasEverDetected) {
+            this.hasEverDetected = true;
+          }
+        },
+        onLowFpsNeeded: () => this.cameraMgr.setLowFps(),
+        onNormalFpsNeeded: () => this.cameraMgr.setNormalFps(),
+      },
+    });
+
     this.engine.onRestart = () => this.game.restart?.();
     this.game.init(gameCanvas, webglCanvas);
 
-    // 设置 resize
     window.addEventListener('resize', () => {
       this.game?.resize?.();
       this.hud.resize(window.innerWidth, window.innerHeight);
     });
     this.hud.resize(window.innerWidth, window.innerHeight);
 
-    // 摄像头回调
+    this.gameLoop.onFrame((time: number) => this.gameFrame(time));
+
     this.cameraMgr.setCallbacks(
       async () => {
-        // 隐藏加载界面
         const loading = document.getElementById('loading');
         if (loading) loading.style.display = 'none';
         await this.initDetector();
@@ -102,18 +108,12 @@ class GameApp {
       (msg: string) => this.showError(msg)
     );
 
-    // 游戏循环
-    this.gameLoop.onFrame((time: number) => this.gameFrame(time));
-
-    // 启动（初始降帧，省 CPU；Ns 後方暂停）
     this.cameraMgr.setLowFps();
-    this.noPersonTimer = performance.now();
     this.cameraMgr.start();
   }
 
   private async initDetector(): Promise<void> {
     await this.detector.init();
-    console.log('Pose detector initialized');
   }
 
   private startGame(): void {
@@ -122,102 +122,56 @@ class GameApp {
   }
 
   private gameFrame(time: number): void {
-    const nowPerf = performance.now();
-
-    // 若已因无人暂停，节流至 1fps（跳过大部分帧，仅每秒检测一次）
-    if (this.isPausedLowFps) {
-      if (nowPerf - this.lastSlowCheck < 1000) {
-        this.renderFrame(null);
-        return;
-      }
-      this.lastSlowCheck = nowPerf;
-    }
-
     const video = this.cameraMgr.getVideoElement();
     if (video.readyState < 2) return;
 
-    // 先用上帧结果判断（省一次检测）
-    // 关键：仅当至少一肩或一髋可见时，方视为「有人」（避免单手臂误检）
-    const hasKeyJoints = this.latestFiltered && (
-      (this.latestFiltered[11] && (this.latestFiltered[11].visibility ?? 0) >= 0.5) ||  // 左肩
-      (this.latestFiltered[12] && (this.latestFiltered[12].visibility ?? 0) >= 0.5) ||  // 右肩
-      (this.latestFiltered[23] && (this.latestFiltered[23].visibility ?? 0) >= 0.5) ||  // 左髋
-      (this.latestFiltered[24] && (this.latestFiltered[24].visibility ?? 0) >= 0.5)     // 右髋
-    );
-    const isPersonDetected = !!hasKeyJoints;
-
-    const result = this.detector.detectForVideo(video, time);
-    const detected = result && result.worldLandmarks && result.worldLandmarks.length > 0;
-
-    if (!detected) {
-      // 开始或继续计时
-      if (isPersonDetected) {
-        this.noPersonTimer = nowPerf;
-      }
-      // 连续 N 秒检测不到人，方暂停并降帧（含初始状态）
-      if (!this.isPausedLowFps && (nowPerf - this.noPersonTimer) >= this.PAUSE_DELAY) {
-        this.engine.pause();
-        this.cameraMgr.setLowFps();
-        this.isPausedLowFps = true;
-        this.lastSlowCheck = nowPerf;
-      }
-      this.latestFiltered = null;
-      if (this.hasEverDetected) {
-        this.landmarkFilter.reset();
-      }
+    // 节流判断：无人时每秒仅一帧做检测，其馀帧仅渲染暂停画面
+    if (this.presenceMonitor.isThrottled()) {
       this.renderFrame(null);
       return;
     }
-    // 检测到人
-    if (!isPersonDetected) {
-      // 刚检测到人，恢复正常帧率，重置计时器
-      this.cameraMgr.setNormalFps();
-      this.noPersonTimer = 0;
-      this.isPausedLowFps = false;
-    }
-    if (!this.hasEverDetected) {
-      console.log('首次检测到人，开始正常游戏逻辑');
-    }
-    this.hasEverDetected = true;
-    this.engine.resume();
 
-    const worldLandmarks = result.worldLandmarks?.[0] ?? result.landmarks?.[0] ?? [];
-    const normLandmarks = result.landmarks?.[0] ?? [];
+    // 此帧为节流状态中允许检测之帧（每秒一次）
+    const result = this.detector.detectForVideo(video, time);
+    const landmarks = result?.landmarks?.[0] ?? null;
+    this.presenceMonitor.update(landmarks);
+
+    if (!this.presenceMonitor.isPresent) {
+      this.latestFiltered = null;
+      this.landmarkFilter.reset();
+      this.renderFrame(null);
+      return;
+    }
+
+    const worldLandmarks = result!.worldLandmarks?.[0] ?? result!.landmarks?.[0] ?? [];
+    const normLandmarks = result!.landmarks?.[0] ?? [];
     const now = performance.now();
-    // landmarkFilter 和 poseRenderer 仍用归一化坐标渲染
     const filtered = this.landmarkFilter.apply(normLandmarks, now);
 
-    // 保存前帧坐标，用于算方向
     const prev = this.latestFiltered;
     this.latestFiltered = filtered;
 
     const motionResult = this.analyzer.analyze(worldLandmarks, normLandmarks);
 
-    // 触发火花——速度逾阈值时，即于部位周迸火花（陨石尾迹式）
     const w = window.innerWidth;
     const h = window.innerHeight;
     for (const [id, part] of Object.entries(motionResult.parts)) {
       if (!part || !part.detected || !part.position) continue;
       const cfg = this.partConfigs.find(c => c.id === id);
-      const minVel = cfg?.minVelocity ?? 0.3; // 唯逾阈值方迸火花
+      const minVel = cfg?.minVelocity ?? 0.3;
       if (part.velocity > minVel) {
         const sx = (1 - part.position.x) * w;
         const sy = part.position.y * h;
-        // 花量与速度平方成正比
         const count = Math.min(50, Math.max(3, Math.floor(part.velocity * part.velocity * 12)));
 
-        // 算运动方向（用屏显坐标，镜像已含其中）
         let dirX: number | undefined;
         let dirY: number | undefined;
         if (prev && cfg) {
           const currTip = filtered[cfg.tipIdx];
           const prevTip = prev[cfg.tipIdx];
           if (currTip && prevTip) {
-            // 屏显坐标：x = (1 - nx) * w, y = ny * h
-            // 故 dx_screen = -(currTip.x - prevTip.x) * w
-            //    dy_screen = (currTip.y - prevTip.y) * h
-            const dx = -(currTip.x - prevTip.x);  // 屏显 x 方向（已镜像）
-            const dy =   currTip.y - prevTip.y;   // 屏显 y 方向（无须镜像）
+            const dx = -(currTip.x - prevTip.x);
+            const dy =   currTip.y - prevTip.y;
             const len = Math.sqrt(dx * dx + dy * dy);
             if (len > 0.001) {
               dirX = dx / len;
@@ -225,13 +179,10 @@ class GameApp {
             }
           }
         }
-
-        // 传速度于 emit()，以控制粒子初速与散布
         this.sparkEffect.emit(sx, sy, count, dirX, dirY, part.velocity);
       }
     }
 
-    this.engine.resume();
     if (this.engine.getState() === GameState.PLAYING) {
       this.game.update(motionResult);
     }
@@ -247,7 +198,6 @@ class GameApp {
       this.poseRenderer.renderPartHighlight(this.latestFiltered, window.innerWidth, window.innerHeight);
     }
 
-    // 火花——须于 pose 之后绘，以免被遮
     this.sparkEffect.update();
     const ctx = this.gameCanvas.getContext('2d');
     if (ctx) this.sparkEffect.render(ctx);
@@ -265,7 +215,6 @@ class GameApp {
   }
 }
 
-// 启动
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => new GameApp());
 } else {
