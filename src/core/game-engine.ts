@@ -63,7 +63,6 @@ export class GameEngine {
     this.score += this.combo * points;
 
     this.soundManager.play('slice');
-    console.log(`Sliced! +${this.combo * points} (combo x${this.combo})`);
   }
 
   getLastSliceInfo(): { pos: Point; time: number } {
@@ -72,7 +71,6 @@ export class GameEngine {
 
   loseLife(): void {
     if (this.practiceMode) {
-      // console.log('练习模式：生命值不减');
       return;
     }
 
@@ -86,7 +84,6 @@ export class GameEngine {
 
   private gameOver(): void {
     if (this.practiceMode) {
-      console.log('练习模式：游戏继续');
       return;
     }
 
@@ -115,7 +112,6 @@ export class GameEngine {
     this.practiceMode = enabled;
     if (enabled) {
       this.lives = 999;
-      console.log('练习模式已启用');
     } else {
       this.lives = this.config.maxLives ?? 3;
     }

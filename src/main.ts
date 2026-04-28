@@ -29,6 +29,10 @@ class GameApp {
   private landmarkFilter: LandmarkFilter;
   private sparkEffect: SparkEffect;
   private hasEverDetected = false;   // 是否已成功检测到人（之后暂停方生效）
+  private noPersonTimer = 0;     // 连续检测不到人的计时器（ms）
+  private readonly PAUSE_DELAY = 1000; // 连续 3 秒检测不到人方暂停
+  private isPausedLowFps = false; // 是否已因无人而暂停并降帧
+  private lastSlowCheck = 0;     // 节流状态下上次检测时间
 
   constructor() {
     const video = document.getElementById('video') as HTMLVideoElement;
@@ -101,8 +105,9 @@ class GameApp {
     // 游戏循环
     this.gameLoop.onFrame((time: number) => this.gameFrame(time));
 
-    // 启动（初始降帧，省 CPU）
+    // 启动（初始降帧，省 CPU；Ns 後方暂停）
     this.cameraMgr.setLowFps();
+    this.noPersonTimer = performance.now();
     this.cameraMgr.start();
   }
 
@@ -117,23 +122,44 @@ class GameApp {
   }
 
   private gameFrame(time: number): void {
+    const nowPerf = performance.now();
+
+    // 若已因无人暂停，节流至 1fps（跳过大部分帧，仅每秒检测一次）
+    if (this.isPausedLowFps) {
+      if (nowPerf - this.lastSlowCheck < 1000) {
+        this.renderFrame(null);
+        return;
+      }
+      this.lastSlowCheck = nowPerf;
+    }
+
     const video = this.cameraMgr.getVideoElement();
     if (video.readyState < 2) return;
 
     // 先用上帧结果判断（省一次检测）
-    const isPersonDetected = this.latestFiltered && this.latestFiltered.length > 0;
+    // 关键：仅当至少一肩或一髋可见时，方视为「有人」（避免单手臂误检）
+    const hasKeyJoints = this.latestFiltered && (
+      (this.latestFiltered[11] && (this.latestFiltered[11].visibility ?? 0) >= 0.5) ||  // 左肩
+      (this.latestFiltered[12] && (this.latestFiltered[12].visibility ?? 0) >= 0.5) ||  // 右肩
+      (this.latestFiltered[23] && (this.latestFiltered[23].visibility ?? 0) >= 0.5) ||  // 左髋
+      (this.latestFiltered[24] && (this.latestFiltered[24].visibility ?? 0) >= 0.5)     // 右髋
+    );
+    const isPersonDetected = !!hasKeyJoints;
 
     const result = this.detector.detectForVideo(video, time);
     const detected = result && result.worldLandmarks && result.worldLandmarks.length > 0;
 
     if (!detected) {
+      // 开始或继续计时
       if (isPersonDetected) {
-        // 刚失去人，降帧
-        this.cameraMgr.setLowFps();
+        this.noPersonTimer = nowPerf;
       }
-      // 若从未检测到人，不暂停（给 MediaPipe 热身时间）
-      if (this.hasEverDetected) {
+      // 连续 N 秒检测不到人，方暂停并降帧（含初始状态）
+      if (!this.isPausedLowFps && (nowPerf - this.noPersonTimer) >= this.PAUSE_DELAY) {
         this.engine.pause();
+        this.cameraMgr.setLowFps();
+        this.isPausedLowFps = true;
+        this.lastSlowCheck = nowPerf;
       }
       this.latestFiltered = null;
       if (this.hasEverDetected) {
@@ -144,8 +170,10 @@ class GameApp {
     }
     // 检测到人
     if (!isPersonDetected) {
-      // 刚检测到人，恢复正常帧率
+      // 刚检测到人，恢复正常帧率，重置计时器
       this.cameraMgr.setNormalFps();
+      this.noPersonTimer = 0;
+      this.isPausedLowFps = false;
     }
     if (!this.hasEverDetected) {
       console.log('首次检测到人，开始正常游戏逻辑');

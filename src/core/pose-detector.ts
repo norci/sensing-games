@@ -44,6 +44,8 @@ export class PoseDetector {
         runningMode: 'VIDEO',
         numPoses: this.config.numPoses!,
         outputSegmentationMasks: false,
+        minPoseDetectionConfidence: 0.7,   // 提高检测置信度，减少误检
+        minTrackingConfidence: 0.7,
       });
       this.isInitialized = true;
       console.log(`PoseDetector initialized with ${this.config.delegate} delegate`);

@@ -7,6 +7,7 @@ export class CameraManager {
   private onCameraReady?: () => void;
   private onCameraFailed?: (msg: string) => void;
   private videoTrack: MediaStreamTrack | null = null;
+  private isLowFps = false;
 
   constructor(videoId: string, promptId: string) {
     this.video = document.getElementById(videoId) as HTMLVideoElement;
@@ -70,9 +71,10 @@ export class CameraManager {
 
   /** 将摄像头帧率降至 1fps（省 CPU） */
   async setLowFps(): Promise<void> {
-    if (!this.videoTrack) return;
+    if (!this.videoTrack || this.isLowFps) return;
     try {
       await this.videoTrack.applyConstraints({ frameRate: { ideal: 1, max: 1 } });
+      this.isLowFps = true;
       console.log('摄像头帧率已降至 1 fps');
     } catch (e) {
       console.warn('无法设置低帧率:', e);
@@ -81,9 +83,10 @@ export class CameraManager {
 
   /** 恢复摄像头正常帧率（30~60 fps） */
   async setNormalFps(): Promise<void> {
-    if (!this.videoTrack) return;
+    if (!this.videoTrack || !this.isLowFps) return;
     try {
       await this.videoTrack.applyConstraints({ frameRate: { ideal: 60, min: 30 } });
+      this.isLowFps = false;
       const settings = this.videoTrack.getSettings();
       console.log(`摄像头帧率已恢复: ${settings.frameRate}fps`);
     } catch (e) {
