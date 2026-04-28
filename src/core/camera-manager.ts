@@ -31,8 +31,8 @@ export class CameraManager {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'user',
-          width: { ideal: 640 },
-          height: { ideal: 480 },
+          width: { ideal: 320 },
+          height: { ideal: 240 },
           frameRate: { ideal: 60, min: 30 },
         },
       });
@@ -45,6 +45,10 @@ export class CameraManager {
           this.videoTrack = stream.getVideoTracks()[0];
           const settings = this.videoTrack.getSettings();
           console.log(`摄像头已启动: ${settings.width}x${settings.height} @ ${settings.frameRate}fps`);
+          // 按实际捕获分辨率显示（缩放 0.5 倍以避免过大）
+          const scale = 0.5;
+          this.video.style.width = `${settings.width! * scale}px`;
+          this.video.style.height = `${settings.height! * scale}px`;
           resolve();
         };
       });
