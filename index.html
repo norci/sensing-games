@@ -47,13 +47,15 @@
 
     #video {
       position: absolute;
-      top: 10px;
-      right: 10px;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
       object-fit: cover;
-      border: 2px solid #333;
-      border-radius: 8px;
-      z-index: 10;
+      z-index: 1;
       transform: scaleX(-1); /* 镜像翻转 */
+      border: none;
+      border-radius: 0;
     }
 
     #gameCanvas {
@@ -62,17 +64,9 @@
       left: 0;
       width: 100%;
       height: 100%;
-      z-index: 5;
-    }
-
-    #webglCanvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 4;
-      pointer-events: none;
+      z-index: 3;
+      pointer-events: auto;
+      background: rgba(26, 26, 46, 0.6);
     }
 
     #loading {
@@ -143,7 +137,6 @@
   <div id="container">
     <video id="video" autoplay playsinline muted webkit-playsinline></video>
     <canvas id="gameCanvas"></canvas>
-    <canvas id="webglCanvas"></canvas>
 
     <div id="loading">
       <h2>体感水果忍者</h2>

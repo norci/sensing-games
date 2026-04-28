@@ -32,7 +32,6 @@ class GameApp {
   constructor() {
     const video = document.getElementById('video') as HTMLVideoElement;
     const gameCanvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
-    const webglCanvas = document.getElementById('webglCanvas') as HTMLCanvasElement;
 
     this.cameraMgr = new CameraManager('video', 'cameraPrompt');
     this.detector = new PoseDetector();
@@ -84,7 +83,7 @@ class GameApp {
     });
 
     this.engine.onRestart = () => this.game.restart?.();
-    this.game.init(gameCanvas, webglCanvas);
+    this.game.init(gameCanvas);
 
     window.addEventListener('resize', () => {
       this.game?.resize?.();

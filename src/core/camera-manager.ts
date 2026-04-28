@@ -45,10 +45,7 @@ export class CameraManager {
           this.videoTrack = stream.getVideoTracks()[0];
           const settings = this.videoTrack.getSettings();
           console.log(`摄像头已启动: ${settings.width}x${settings.height} @ ${settings.frameRate}fps`);
-          // 按实际捕获分辨率显示（缩放 0.5 倍以避免过大）
-          const scale = 0.5;
-          this.video.style.width = `${settings.width! * scale}px`;
-          this.video.style.height = `${settings.height! * scale}px`;
+          // video 尺寸由 CSS 控制，此处不再设置
           resolve();
         };
       });

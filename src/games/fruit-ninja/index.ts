@@ -105,11 +105,8 @@ export class FruitNinjaGame implements IGameMode {
     const context = ctx || this.ctx;
     if (!context || !this.canvas) return;
 
-    context.fillStyle = 'rgba(0, 0, 0, 0.2)';
-    context.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-    context.fillStyle = '#1a1a2e';
-    context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    // 清除画布（透明），CSS background 会透出，video 自然可见
+    context.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     // 绘制 70% 区域边框
     const borderMarginX = this.canvas.width * 0.15;
