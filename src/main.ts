@@ -7,7 +7,6 @@ import { getGameMode, IGameMode } from './games/index.js';
 import { HUD, HUDConfig } from './ui/hud.js';
 import { DEFAULT_BODY_CONFIGS } from './core/types.js';
 import { PoseRenderer } from './shared/pose-renderer.js';
-import { LandmarkFilter } from './core/landmark-filter.js';
 import { SparkEffect } from './core/particle-system.js';
 import { PersonPresenceMonitor } from './core/presence-monitor.js';
 
@@ -26,9 +25,7 @@ class GameApp {
 
   // 状态
   private latestFiltered: any[] | null = null;
-  private prevFiltered: any[] | null = null;
   private partConfigs: typeof DEFAULT_BODY_CONFIGS;
-  private landmarkFilter: LandmarkFilter;
   private sparkEffect: SparkEffect;
   private hasEverDetected = false;
 
@@ -69,7 +66,6 @@ class GameApp {
     this.poseRenderer = new PoseRenderer(gameCanvas.getContext('2d')!);
     this.gameLoop = new GameLoop();
 
-    this.landmarkFilter = new LandmarkFilter(this.partConfigs);
     this.sparkEffect = new SparkEffect();
 
     this.presenceMonitor = new PersonPresenceMonitor({
@@ -138,17 +134,14 @@ class GameApp {
 
     if (!this.presenceMonitor.isPresent) {
       this.latestFiltered = null;
-      this.landmarkFilter.reset();
       return;
     }
 
     const worldLandmarks = result!.worldLandmarks?.[0] ?? result!.landmarks?.[0] ?? [];
     const normLandmarks = result!.landmarks?.[0] ?? [];
-    const now = performance.now();
-    const filtered = this.landmarkFilter.apply(normLandmarks, now);
 
     const prev = this.latestFiltered;
-    this.latestFiltered = filtered;
+    this.latestFiltered = normLandmarks;
 
     const motionResult = this.analyzer.analyze(worldLandmarks, normLandmarks);
 
@@ -166,7 +159,7 @@ class GameApp {
         let dirX: number | undefined;
         let dirY: number | undefined;
         if (prev && cfg) {
-          const currTip = filtered[cfg.tipIdx];
+          const currTip = normLandmarks[cfg.tipIdx];
           const prevTip = prev[cfg.tipIdx];
           if (currTip && prevTip) {
             const dx = -(currTip.x - prevTip.x);
