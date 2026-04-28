@@ -5,7 +5,7 @@ export interface PoseDetectorConfig {
   modelPath?: string;
   wasmPath?: string;
   delegate?: 'CPU' | 'GPU';
-  runningMode?: 'IMAGE' | 'VIDEO' | 'LIVE_STREAM';
+  runningMode?: 'IMAGE' | 'VIDEO';
   numPoses?: number;
   outputWorldLandmarks?: boolean;
 }
@@ -44,7 +44,7 @@ export class PoseDetector {
         runningMode: 'VIDEO',
         numPoses: this.config.numPoses!,
         outputSegmentationMasks: false,
-        minPoseDetectionConfidence: 0.7,   // 提高检测置信度，减少误检
+        minPoseDetectionConfidence: 0.7,
         minTrackingConfidence: 0.7,
       });
       this.isInitialized = true;

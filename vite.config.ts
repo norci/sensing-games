@@ -5,7 +5,7 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 3000,
     open: false,
-    allowedHosts: true,  // 允许任意域名访问（Tailscale 等）
+    allowedHosts: ['ryzen.tail5472a9.ts.net', '.tail5472a9.ts.net'],
   },
   build: {
     outDir: 'dist',

@@ -96,7 +96,8 @@ class GameApp {
     });
     this.hud.resize(window.innerWidth, window.innerHeight);
 
-    this.gameLoop.onFrame((time: number) => this.gameFrame(time));
+    this.gameLoop.onFrame((time: number) => this.renderFrame(time));
+    this.gameLoop.onDetect((time: number) => this.detectFrame(time));
 
     this.cameraMgr.setCallbacks(
       async () => {
@@ -121,25 +122,23 @@ class GameApp {
     this.gameLoop.start();
   }
 
-  private gameFrame(time: number): void {
+  private detectFrame(time: number): void {
     const video = this.cameraMgr.getVideoElement();
     if (video.readyState < 2) return;
 
-    // 节流判断：无人时每秒仅一帧做检测，其馀帧仅渲染暂停画面
     if (this.presenceMonitor.isThrottled()) {
-      this.renderFrame(null);
       return;
     }
 
-    // 此帧为节流状态中允许检测之帧（每秒一次）
     const result = this.detector.detectForVideo(video, time);
-    const landmarks = result?.landmarks?.[0] ?? null;
+    if (!result) return;
+
+    const landmarks = result.landmarks?.[0] ?? null;
     this.presenceMonitor.update(landmarks);
 
     if (!this.presenceMonitor.isPresent) {
       this.latestFiltered = null;
       this.landmarkFilter.reset();
-      this.renderFrame(null);
       return;
     }
 
@@ -186,8 +185,6 @@ class GameApp {
     if (this.engine.getState() === GameState.PLAYING) {
       this.game.update(motionResult);
     }
-
-    this.renderFrame(motionResult);
   }
 
   private renderFrame(motionResult: any): void {
