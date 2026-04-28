@@ -28,6 +28,7 @@ class GameApp {
   private partConfigs: typeof DEFAULT_BODY_CONFIGS;
   private landmarkFilter: LandmarkFilter;
   private sparkEffect: SparkEffect;
+  private hasEverDetected = false;   // 是否已成功检测到人（之后暂停方生效）
 
   constructor() {
     const video = document.getElementById('video') as HTMLVideoElement;
@@ -100,7 +101,8 @@ class GameApp {
     // 游戏循环
     this.gameLoop.onFrame((time: number) => this.gameFrame(time));
 
-    // 启动
+    // 启动（初始降帧，省 CPU）
+    this.cameraMgr.setLowFps();
     this.cameraMgr.start();
   }
 
@@ -118,15 +120,38 @@ class GameApp {
     const video = this.cameraMgr.getVideoElement();
     if (video.readyState < 2) return;
 
+    // 先用上帧结果判断（省一次检测）
+    const isPersonDetected = this.latestFiltered && this.latestFiltered.length > 0;
+
     const result = this.detector.detectForVideo(video, time);
-    if (!result || !result.worldLandmarks || result.worldLandmarks.length === 0) {
-      // 检测不到人，暂停
-      this.engine.pause();
+    const detected = result && result.worldLandmarks && result.worldLandmarks.length > 0;
+
+    if (!detected) {
+      if (isPersonDetected) {
+        // 刚失去人，降帧
+        this.cameraMgr.setLowFps();
+      }
+      // 若从未检测到人，不暂停（给 MediaPipe 热身时间）
+      if (this.hasEverDetected) {
+        this.engine.pause();
+      }
       this.latestFiltered = null;
-      this.landmarkFilter.reset();
+      if (this.hasEverDetected) {
+        this.landmarkFilter.reset();
+      }
       this.renderFrame(null);
       return;
     }
+    // 检测到人
+    if (!isPersonDetected) {
+      // 刚检测到人，恢复正常帧率
+      this.cameraMgr.setNormalFps();
+    }
+    if (!this.hasEverDetected) {
+      console.log('首次检测到人，开始正常游戏逻辑');
+    }
+    this.hasEverDetected = true;
+    this.engine.resume();
 
     const worldLandmarks = result.worldLandmarks?.[0] ?? result.landmarks?.[0] ?? [];
     const normLandmarks = result.landmarks?.[0] ?? [];

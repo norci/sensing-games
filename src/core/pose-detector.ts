@@ -7,11 +7,6 @@ export interface PoseDetectorConfig {
   delegate?: 'CPU' | 'GPU';
   runningMode?: 'IMAGE' | 'VIDEO' | 'LIVE_STREAM';
   numPoses?: number;
-  /**
-   * 是否输出世界坐标系 landmark（单位：米，原点在髋中心）
-   * 注意：根据 MediaPipe 类型定义，worldLandmarks 始终包含在结果中，
-   * 此配置项仅用于内部标记，不影响 API 调用
-   */
   outputWorldLandmarks?: boolean;
 }
 
@@ -20,16 +15,16 @@ export class PoseDetector {
   private isInitialized = false;
   private onPoseDetected?: (result: PoseLandmarkerResult) => void;
   private config: Required<PoseDetectorConfig>;
+  private lastTs = 0; // 时间戳单调递增保护
 
   constructor(config?: PoseDetectorConfig) {
     this.config = {
       modelPath: '/models/pose_landmarker_lite.task',
-      // 智能选择：局域网从本地加载，外网从 CDN 加载
       wasmPath: getWasmPath(),
       delegate: this.isMobile() ? 'CPU' : 'GPU',
       runningMode: 'VIDEO',
       numPoses: 1,
-      outputWorldLandmarks: true, // 标记：世界坐标系始终启用（MediaPipe 默认输出）
+      outputWorldLandmarks: true,
       ...config
     };
   }
@@ -41,7 +36,6 @@ export class PoseDetector {
   async init(): Promise<void> {
     try {
       const vision = await FilesetResolver.forVisionTasks(this.config.wasmPath!);
-      
       this.landmarker = await PoseLandmarker.createFromOptions(vision, {
         baseOptions: {
           modelAssetPath: this.config.modelPath!,
@@ -50,9 +44,7 @@ export class PoseDetector {
         runningMode: 'VIDEO',
         numPoses: this.config.numPoses!,
         outputSegmentationMasks: false,
-        // 注意：MediaPipe PoseLandmarker 默认输出 worldLandmarks，无需额外配置
       });
-
       this.isInitialized = true;
       console.log(`PoseDetector initialized with ${this.config.delegate} delegate`);
     } catch (error) {
@@ -61,13 +53,21 @@ export class PoseDetector {
     }
   }
 
-  detectForVideo(video: HTMLVideoElement, timestamp: number): PoseLandmarkerResult | null {
-    if (!this.isInitialized || !this.landmarker) {
-      return null;
-    }
+  /**
+   * 时间戳单调递增保护：
+   * MediaPipe 要求时间戳严格递增。applyConstraints 改变帧率後易出现 timestamp mismatch。
+   * 此处用 performance.now() 产生单调递增微秒时间戳，不依赖视频时间戳。
+   */
+  detectForVideo(video: HTMLVideoElement, _videoTs: number): PoseLandmarkerResult | null {
+    if (!this.isInitialized || !this.landmarker) return null;
+
+    // 用 performance.now() 产生单调递增微秒时间戳
+    const nowUs = Math.floor(performance.now() * 1000);
+    const safeTs = Math.max(nowUs, this.lastTs + 1);
+    this.lastTs = safeTs;
 
     try {
-      const result = this.landmarker.detectForVideo(video, timestamp);
+      const result = this.landmarker.detectForVideo(video, safeTs);
       return result;
     } catch (error) {
       console.error('Pose detection error:', error);
@@ -84,6 +84,7 @@ export class PoseDetector {
       this.landmarker.close();
       this.landmarker = null;
       this.isInitialized = false;
+      this.lastTs = 0;
     }
   }
 }
