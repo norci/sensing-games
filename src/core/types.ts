@@ -79,7 +79,7 @@ export const DEFAULT_HAND_CONFIGS: BodyPartConfig[] = [
 
 /** 头部配置：用估算的头顶坐标（鼻子向上延伸） */
 export const DEFAULT_HEAD_CONFIGS: BodyPartConfig[] = [
-  { id: 'head', tipIdx: 0, midIdx: 0, rootIdx: 0, skipAngle: true, isHead: true, minVelocity: 1 },
+  { id: 'head', tipIdx: 0, midIdx: 0, rootIdx: 0, skipAngle: true, isHead: true, minVelocity: 1.0 },
 ];
 
 /** 默认双脚配置 */
@@ -90,14 +90,14 @@ export const DEFAULT_FOOT_CONFIGS: BodyPartConfig[] = [
 
 /** 肘部配置：tip=肘关节本身，检测肘部运动 */
 export const DEFAULT_ELBOW_CONFIGS: BodyPartConfig[] = [
-  { id: 'leftElbow',  tipIdx: 13, midIdx: 13, rootIdx: 11, invertAngle: true, minVelocity: 2 },
-  { id: 'rightElbow', tipIdx: 14, midIdx: 14, rootIdx: 12, invertAngle: true, minVelocity: 2 },
+  { id: 'leftElbow',  tipIdx: 13, midIdx: 13, rootIdx: 11, invertAngle: true, minVelocity: 3 },
+  { id: 'rightElbow', tipIdx: 14, midIdx: 14, rootIdx: 12, invertAngle: true, minVelocity: 3 },
 ];
 
 /** 膝部配置：tip=膝关节本身，检测膝部运动 */
 export const DEFAULT_KNEE_CONFIGS: BodyPartConfig[] = [
-  { id: 'leftKnee',  tipIdx: 25, midIdx: 25, rootIdx: 23, invertAngle: true, minVelocity: 2.0 },
-  { id: 'rightKnee', tipIdx: 26, midIdx: 26, rootIdx: 24, invertAngle: true, minVelocity: 2.0 },
+  { id: 'leftKnee',  tipIdx: 25, midIdx: 25, rootIdx: 23, invertAngle: true, minVelocity: 3.0 },
+  { id: 'rightKnee', tipIdx: 26, midIdx: 26, rootIdx: 24, invertAngle: true, minVelocity: 3.0 },
 ];
 
 /** 全部身体部位配置 */

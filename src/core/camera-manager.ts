@@ -28,11 +28,15 @@ export class CameraManager {
     }
 
     try {
+      // 检测屏幕宽高比，使视频帧比例与屏幕一致
+      const screenAspect = window.innerWidth / window.innerHeight;
+      console.log(`屏幕宽高比: ${screenAspect.toFixed(3)}`);
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'user',
-          width: { ideal: 320 },
-          height: { ideal: 240 },
+          width: { ideal: 160 },
+          aspectRatio: { ideal: screenAspect },
           frameRate: { ideal: 60, min: 30 },
         },
       });

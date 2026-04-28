@@ -62,7 +62,7 @@ class GameApp {
         ctx.fillText('斩！', sliceInfo.pos.x, sliceInfo.pos.y - 30);
       }
     });
-    this.poseRenderer = new PoseRenderer(gameCanvas.getContext('2d')!);
+    this.poseRenderer = new PoseRenderer(gameCanvas.getContext('2d')!, video);
     this.gameLoop = new GameLoop();
 
     this.sparkEffect = new SparkEffect();

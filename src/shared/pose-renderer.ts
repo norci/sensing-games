@@ -28,9 +28,45 @@ export class PoseRenderer {
   private ctx: CanvasRenderingContext2D;
   private landmarkRadius = 4;
   private connectionLineWidth = 2;
+  private video: HTMLVideoElement | null = null;
 
-  constructor(ctx: CanvasRenderingContext2D) {
+  constructor(ctx: CanvasRenderingContext2D, video?: HTMLVideoElement) {
     this.ctx = ctx;
+    this.video = video ?? null;
+  }
+
+  setVideo(video: HTMLVideoElement): void {
+    this.video = video;
+  }
+
+  // 将归一化坐标转为画布坐标（考虑 object-fit: contain 黑边）
+  private toCanvasCoords(
+    nx: number, ny: number,
+    canvasWidth: number, canvasHeight: number
+  ): { x: number; y: number } {
+    const v = this.video;
+    if (!v || !v.videoWidth || !v.videoHeight) {
+      // 无视频信息，回退至简单映射（含镜像）
+      return { x: (1 - nx) * canvasWidth, y: ny * canvasHeight };
+    }
+
+    const vw = v.videoWidth;
+    const vh = v.videoHeight;
+
+    // object-fit: contain 之缩放比
+    const scale = Math.min(canvasWidth / vw, canvasHeight / vh);
+    const displayW = vw * scale;
+    const displayH = vh * scale;
+    const offsetX = (canvasWidth - displayW) / 2;
+    const offsetY = (canvasHeight - displayH) / 2;
+
+    // 镜像翻转（与 CSS transform: scaleX(-1) 对应）
+    const mx = 1 - nx;
+
+    return {
+      x: offsetX + mx * displayW,
+      y: offsetY + ny * displayH,
+    };
   }
 
   render(landmarks: NormalizedLandmark[], canvasWidth: number, canvasHeight: number): void {
@@ -53,10 +89,8 @@ export class PoseRenderer {
         continue;
       }
 
-      const x1 = (1 - start.x) * canvasWidth; // 镜像翻转
-      const y1 = start.y * canvasHeight;
-      const x2 = (1 - end.x) * canvasWidth;
-      const y2 = end.y * canvasHeight;
+      const { x: x1, y: y1 } = this.toCanvasCoords(start.x, start.y, canvasWidth, canvasHeight);
+      const { x: x2, y: y2 } = this.toCanvasCoords(end.x, end.y, canvasWidth, canvasHeight);
 
       // 根据部位选择颜色（浅色，适配黑色背景）
       let color = '#00ff88'; // 浅绿 - 默认
@@ -79,8 +113,7 @@ export class PoseRenderer {
       const lm = landmarks[i];
       if ((lm.visibility ?? 0) < 0.5) continue;
 
-      const x = (1 - lm.x) * canvasWidth; // 镜像翻转
-      const y = lm.y * canvasHeight;
+      const { x, y } = this.toCanvasCoords(lm.x, lm.y, canvasWidth, canvasHeight);
 
       // 根据部位选择颜色（浅色，适配黑色背景）
       let color = '#00ff88'; // 浅绿 - 默认
@@ -121,8 +154,7 @@ export class PoseRenderer {
 
     // 头球圆圈——直接用鼻尖（landmark 0）
     if (landmarks[0] && (landmarks[0].visibility ?? 0) >= 0.5) {
-      const hx = (1 - landmarks[0].x) * canvasWidth;
-      const hy = landmarks[0].y * canvasHeight;
+      const { x: hx, y: hy } = this.toCanvasCoords(landmarks[0].x, landmarks[0].y, canvasWidth, canvasHeight);
       this.ctx.strokeStyle = '#dd88ff';
       this.ctx.lineWidth = 3;
       this.ctx.beginPath();
@@ -139,8 +171,7 @@ export class PoseRenderer {
       const lm = landmarks[h.idx];
       if (!lm || (lm.visibility ?? 0) < 0.5) continue;
 
-      const x = (1 - lm.x) * canvasWidth;
-      const y = lm.y * canvasHeight;
+      const { x, y } = this.toCanvasCoords(lm.x, lm.y, canvasWidth, canvasHeight);
 
       this.ctx.strokeStyle = h.color;
       this.ctx.lineWidth = 3;
