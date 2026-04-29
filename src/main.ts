@@ -9,11 +9,13 @@ import { DEFAULT_BODY_CONFIGS } from './core/types.js';
 import { PoseRenderer } from './shared/pose-renderer.js';
 import { SparkEffect } from './core/particle-system.js';
 import { PersonPresenceMonitor } from './core/presence-monitor.js';
+import { FilterManager } from './core/filter-manager.js';
 
 class GameApp {
   // 核心模块
   private cameraMgr: CameraManager;
   private detector: PoseDetector;
+  private filterManager: FilterManager;
   private analyzer: MotionAnalyzer;
   private engine: GameEngine;
   private game: IGameMode;
@@ -35,6 +37,7 @@ class GameApp {
 
     this.cameraMgr = new CameraManager('video', 'cameraPrompt');
     this.detector = new PoseDetector();
+    this.filterManager = new FilterManager();
     this.partConfigs = DEFAULT_BODY_CONFIGS;
     this.analyzer = new MotionAnalyzer(this.partConfigs);
     this.engine = new GameEngine({ practiceMode: true });
@@ -73,6 +76,7 @@ class GameApp {
         onAbsent: () => this.engine.pause(),
         onPresent: () => {
           this.engine.resume();
+          this.filterManager.reset();
           if (!this.hasEverDetected) {
             this.hasEverDetected = true;
           }
@@ -128,7 +132,10 @@ class GameApp {
     const result = this.detector.detectForVideo(video, time);
     if (!result) return;
 
-    const landmarks = result.landmarks?.[0] ?? null;
+    // 应用滤波器（含速度计算与自适应 IIR）
+    const filteredResult = this.filterManager.apply(result);
+
+    const landmarks = filteredResult.landmarks?.[0] ?? null;
     this.presenceMonitor.update(landmarks);
 
     if (!this.presenceMonitor.isPresent) {
@@ -136,8 +143,8 @@ class GameApp {
       return;
     }
 
-    const worldLandmarks = result!.worldLandmarks?.[0] ?? result!.landmarks?.[0] ?? [];
-    const normLandmarks = result!.landmarks?.[0] ?? [];
+    const worldLandmarks = filteredResult.worldLandmarks?.[0] ?? [];
+    const normLandmarks = filteredResult.landmarks?.[0] ?? [];
 
     const prev = this.latestFiltered;
     this.latestFiltered = normLandmarks;
