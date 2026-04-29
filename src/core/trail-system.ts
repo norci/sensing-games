@@ -103,9 +103,12 @@ export class TrailSystem {
     }
   }
 
-  /** 获取某部位的轨迹点（用于碰撞检测） */
+  /** 获取某部位的轨迹点（用于碰撞检测），仅返回最近 fadeTime 内之点 */
   getTrail(id: string): TrailPoint[] {
-    return this.trails.get(id)?.points ?? [];
+    const state = this.trails.get(id);
+    if (!state) return [];
+    const cutoff = performance.now() - this.config.fadeTime;
+    return state.points.filter(p => p.createdAt >= cutoff);
   }
 
   /** 设置某部位的轨迹点（供外部覆盖，如从保存的状态恢复） */

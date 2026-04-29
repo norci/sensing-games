@@ -1,4 +1,4 @@
-import { BodyPartConfig, BodyPartResult, MotionAnalyzerConfig, MotionResult, Point } from './types.js';
+import { BodyPartConfig, BodyPartResult, MotionAnalyzerConfig, MotionResult, Point, DEFAULT_MOTION_ANALYZER_CONFIG } from './types.js';
 
 /** 单个部位的分析状态 */
 interface PartState {
@@ -36,12 +36,7 @@ export class MotionAnalyzer {
       });
     }
     this.analyzerConfig = {
-      minAngle: 60,
-      knockingAngleMax: 30,
-      minVelocity: 0.3,
-      invertAngleMax: 80,
-      invertMinVelocity: 0.1,
-      historySize: 3,
+      ...DEFAULT_MOTION_ANALYZER_CONFIG,
       ...config,
     };
   }

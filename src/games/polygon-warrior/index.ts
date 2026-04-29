@@ -107,8 +107,8 @@ export class PolygonWarriorGame implements IGameMode {
     this.particleSystem.update();
 
     if (motionResult.isBigSwing) {
-      this.checkSlice(motionResult);
       this.slicingSystem.updateTrail(motionResult, this.canvas!.width, this.canvas!.height);
+      this.checkSlice(motionResult);
     }
   }
 

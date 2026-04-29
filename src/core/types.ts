@@ -109,6 +109,16 @@ export const DEFAULT_BODY_CONFIGS: BodyPartConfig[] = [
   ...DEFAULT_KNEE_CONFIGS,
 ];
 
+/** 动作分析器默认配置 */
+export const DEFAULT_MOTION_ANALYZER_CONFIG: Required<MotionAnalyzerConfig> = {
+  minAngle: 60,
+  knockingAngleMax: 30,
+  minVelocity: 0.3,
+  invertAngleMax: 80,
+  invertMinVelocity: 0.1,
+  historySize: 3,
+};
+
 // ==================== 游戏框架类型 ===================
 
 /** 游戏配置 */
