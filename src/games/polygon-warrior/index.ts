@@ -118,19 +118,6 @@ export class PolygonWarriorGame implements IGameMode {
 
     context.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    const borderMarginX = this.canvas.width * 0.15;
-    const borderMarginY = this.canvas.height * 0.15;
-    context.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-    context.lineWidth = 2;
-    context.setLineDash([8, 8]);
-    context.strokeRect(
-      borderMarginX,
-      borderMarginY,
-      this.canvas.width - borderMarginX * 2,
-      this.canvas.height - borderMarginY * 2
-    );
-    context.setLineDash([]);
-
     this.shapes.forEach(shape => shape.render(context));
     this.slicingSystem.renderTrail(context);
     this.particleSystem.render(context);

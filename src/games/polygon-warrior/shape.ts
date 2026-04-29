@@ -60,8 +60,6 @@ export class Shape {
   public isMissed = false;
   private readonly canvasHeight: number;
   private readonly canvasWidth: number;
-  private readonly xMargin: number;
-  private readonly yMargin: number;
 
   /** 分数 = 边数 */
   public readonly rawScore: number;
@@ -73,8 +71,6 @@ export class Shape {
   constructor(launchParams: LaunchParams, canvasWidth: number, canvasHeight: number) {
     this.canvasWidth = canvasWidth;
     this.canvasHeight = canvasHeight;
-    this.xMargin = canvasWidth * 0.15;
-    this.yMargin = canvasHeight * 0.15;
 
     this.x = launchParams.startPos.x;
     this.y = launchParams.startPos.y;
@@ -131,13 +127,13 @@ export class Shape {
     this.y += this.vy;
     this.vy += this.gravity;
 
-    if (this.x < this.xMargin) { this.x = this.xMargin; this.vx = Math.abs(this.vx); }
-    else if (this.x > this.canvasWidth - this.xMargin) { this.x = this.canvasWidth - this.xMargin; this.vx = -Math.abs(this.vx); }
+    // 左右边界反弹（ full screen ）
+    if (this.x < this.radius) { this.x = this.radius; this.vx = Math.abs(this.vx); }
+    else if (this.x > this.canvasWidth - this.radius) { this.x = this.canvasWidth - this.radius; this.vx = -Math.abs(this.vx); }
 
-    if (this.y < this.yMargin) { this.y = this.yMargin; this.vy = Math.abs(this.vy); }
-    else if (this.y > this.canvasHeight - this.yMargin) {
-      this.y = this.canvasHeight - this.yMargin;
-      this.vy = -Math.abs(this.vy);
+    // 上边界反弹；下边界出屏则 miss
+    if (this.y < this.radius) { this.y = this.radius; this.vy = Math.abs(this.vy); }
+    else if (this.y - this.radius > this.canvasHeight) {
       this.isMissed = true;
     }
   }
