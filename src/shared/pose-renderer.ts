@@ -27,7 +27,7 @@ const TORSO_PARTS = [11, 12, 23, 24];
 export class PoseRenderer {
   private ctx: CanvasRenderingContext2D;
   private landmarkRadius = 4;
-  private connectionLineWidth = 2;
+  private connectionLineWidth = 1;
   private video: HTMLVideoElement | null = null;
 
   constructor(ctx: CanvasRenderingContext2D, video?: HTMLVideoElement) {
@@ -127,17 +127,12 @@ export class PoseRenderer {
         color = '#ffff66'; // 浅黄 - 躯干
       }
 
-      // 绘制外圈
-      this.ctx.fillStyle = color;
-      this.ctx.beginPath();
-      this.ctx.arc(x, y, this.landmarkRadius + 1, 0, 2 * Math.PI);
-      this.ctx.fill();
-
-      // 绘制内圈（白色）
-      this.ctx.fillStyle = '#ffffff';
+      // 绘制圆圈（描边）
+      this.ctx.strokeStyle = color;
+      this.ctx.lineWidth = 1;
       this.ctx.beginPath();
       this.ctx.arc(x, y, this.landmarkRadius, 0, 2 * Math.PI);
-      this.ctx.fill();
+      this.ctx.stroke();
     }
   }
 
@@ -156,7 +151,7 @@ export class PoseRenderer {
     if (landmarks[0] && (landmarks[0].visibility ?? 0) >= 0.5) {
       const { x: hx, y: hy } = this.toCanvasCoords(landmarks[0].x, landmarks[0].y, canvasWidth, canvasHeight);
       this.ctx.strokeStyle = '#dd88ff';
-      this.ctx.lineWidth = 3;
+      this.ctx.lineWidth = 1;
       this.ctx.beginPath();
       this.ctx.arc(hx, hy, 15, 0, 2 * Math.PI);
       this.ctx.stroke();
@@ -174,7 +169,7 @@ export class PoseRenderer {
       const { x, y } = this.toCanvasCoords(lm.x, lm.y, canvasWidth, canvasHeight);
 
       this.ctx.strokeStyle = h.color;
-      this.ctx.lineWidth = 3;
+      this.ctx.lineWidth = 1;
       this.ctx.beginPath();
       this.ctx.arc(x, y, 15, 0, 2 * Math.PI);
       this.ctx.stroke();
