@@ -49,10 +49,11 @@ export class FilterManager {
     const speeds = this.calcSpeeds(world);
 
     // 对归一化坐标滤波（用于渲染）
-    result.landmarks = [this.normFilter.filter(norms, speeds)];
+    // 注：landmarks 与 worldLandmarks 为只读属性，须用类型断言
+    (result as any).landmarks = [this.normFilter.filter(norms, speeds)];
 
     // 对世界坐标滤波（用于运动分析）
-    result.worldLandmarks = [this.worldFilter.filter(world, speeds)];
+    (result as any).worldLandmarks = [this.worldFilter.filter(world, speeds)];
 
     return result;
   }

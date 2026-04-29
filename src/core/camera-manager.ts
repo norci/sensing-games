@@ -35,7 +35,7 @@ export class CameraManager {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'user',
-          width: { ideal: 320 },
+          width: { ideal: 480 },
           aspectRatio: { ideal: screenAspect },
           frameRate: { ideal: 60, min: 30 },
         },

@@ -41,11 +41,11 @@ class GameApp {
     this.partConfigs = DEFAULT_BODY_CONFIGS;
     this.analyzer = new MotionAnalyzer(this.partConfigs);
     this.engine = new GameEngine({ practiceMode: true });
-    this.game = getGameMode('fruit-ninja', this.engine)!;
+    this.game = getGameMode('polygon-warrior', this.engine)!;
     this.gameCanvas = gameCanvas;
     const hudConfig: HUDConfig = {
-      title: '体感水果忍者',
-      welcomeSubtitle: '挥动单刀切水果，避开炸弹！',
+      title: '多边形战士',
+      welcomeSubtitle: '挥动肢体切多边形，避开炸弹！',
       welcomePrompt: '请用右手大幅度挥刀开始游戏',
       pausedText: '暂停',
       pausedPrompt: '未检测到人体，请站到摄像头前',

@@ -1,12 +1,11 @@
 import { IGameMode } from '../core/types.js';
-import { FruitNinjaGame } from './fruit-ninja/index.js';
+import { PolygonWarriorGame } from './polygon-warrior/index.js';
 
 export type { IGameMode };
 
 // 游戏模式注册表
 const gameModes: Record<string, new (...args: any[]) => IGameMode> = {
-  'fruit-ninja': FruitNinjaGame,
-  // 后续可扩展：'archery', 'boxing'等
+  'polygon-warrior': PolygonWarriorGame,
 };
 
 export function getGameMode(name: string, ...args: any[]): IGameMode | null {
@@ -22,4 +21,4 @@ export function listGameModes(): string[] {
   return Object.keys(gameModes);
 }
 
-export { FruitNinjaGame };
+export { PolygonWarriorGame };

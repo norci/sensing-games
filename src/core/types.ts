@@ -82,10 +82,10 @@ export const DEFAULT_HEAD_CONFIGS: BodyPartConfig[] = [
   { id: 'head', tipIdx: 0, midIdx: 0, rootIdx: 0, skipAngle: true, isHead: true, minVelocity: 1.0 },
 ];
 
-/** 默认双脚配置 */
+/** 默认双脚配置（使用脚尖坐标） */
 export const DEFAULT_FOOT_CONFIGS: BodyPartConfig[] = [
-  { id: 'leftFoot',  tipIdx: 27, midIdx: 25, rootIdx: 23, minVelocity: 2.5 },
-  { id: 'rightFoot', tipIdx: 28, midIdx: 26, rootIdx: 24, minVelocity: 2.5 },
+  { id: 'leftFoot',  tipIdx: 31, midIdx: 27, rootIdx: 23, minVelocity: 2.5 },
+  { id: 'rightFoot', tipIdx: 32, midIdx: 28, rootIdx: 24, minVelocity: 2.5 },
 ];
 
 /** 肘部配置：tip=肘关节本身，检测肘部运动 */

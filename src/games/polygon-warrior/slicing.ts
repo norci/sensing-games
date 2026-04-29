@@ -1,5 +1,5 @@
-import { Fruit } from './fruit.js';
-import { MotionResult, BodyPartResult } from '../../core/types.js';
+import { Shape } from './shape.js';
+import { MotionResult, BodyPartId } from '../../core/types.js';
 import { TrailSystem, TrailPoint } from '../../core/trail-system.js';
 import { lineCircleIntersect, pointToLineDistance } from '../../shared/collision-utils.js';
 
@@ -16,6 +16,12 @@ const TRAIL_COLORS: Record<string, { prefix: string; hex: string }> = {
   rightKnee:  { prefix: 'rgba(200, 50, 100, ',  hex: '#c83264' },
 };
 
+/** 可切割的身体部位（手部 + 脚部） */
+const SLICEABLE_PARTS: BodyPartId[] = ['leftHand', 'rightHand', 'leftFoot', 'rightFoot'];
+
+/** 切割判定厚度（像素） */
+const SLICE_THICKNESS = 8;
+
 export class SlicingSystem {
   private trailSystem: TrailSystem;
 
@@ -23,7 +29,6 @@ export class SlicingSystem {
     this.trailSystem = new TrailSystem();
   }
 
-  // 在动作过程中持续更新轨迹（不论速率，始终画轨迹）
   updateTrail(motionResult: MotionResult, canvasWidth: number, canvasHeight: number): void {
     for (const [id, part] of Object.entries(motionResult.parts)) {
       if (part.detected) {
@@ -34,38 +39,36 @@ export class SlicingSystem {
     }
   }
 
-  // 检测切割
-  checkSlice(fruit: Fruit, motionResult: MotionResult): boolean {
-    for (const [id, part] of Object.entries(motionResult.parts)) {
+  checkSlice(shape: Shape, motionResult: MotionResult): boolean {
+    for (const partId of SLICEABLE_PARTS) {
+      const part = motionResult.parts[partId];
       if (part && part.isBigSwing) {
-        const trail = this.trailSystem.getTrail(id);
-        if (trail.length >= 2 && this.checkPartSlice(trail, fruit)) return true;
+        const trail = this.trailSystem.getTrail(partId);
+        if (trail && trail.length >= 2 && this.checkPartSlice(trail, shape)) {
+          return true;
+        }
       }
     }
     return false;
   }
 
-  private checkPartSlice(
-    trail: TrailPoint[],
-    fruit: Fruit
-  ): boolean {
-    const fruitCircle = fruit.getCircle();
-    const thickness = 15;
+  private checkPartSlice(trail: TrailPoint[], shape: Shape): boolean {
+    const shapeCircle = shape.getCircle();
 
     for (let i = 1; i < trail.length; i++) {
       const isSliced = lineCircleIntersect(
         trail[i - 1],
         trail[i],
-        fruitCircle
+        shapeCircle
       );
       if (isSliced) return true;
 
       const dist = pointToLineDistance(
-        { x: fruitCircle.x, y: fruitCircle.y },
+        { x: shapeCircle.x, y: shapeCircle.y },
         trail[i - 1],
         trail[i]
       );
-      if (dist <= fruitCircle.radius + thickness) return true;
+      if (dist <= shapeCircle.radius + SLICE_THICKNESS) return true;
     }
     return false;
   }

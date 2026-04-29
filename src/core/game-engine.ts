@@ -11,7 +11,6 @@ export enum GameState {
 export class GameEngine {
   private state: GameState = GameState.IDLE;
   private score: number = 0;
-  private lives: number;
   private combo: number = 0;
   private lastSliceTime: number = 0;
   private lastSlicePos: Point = { x: 0, y: 0 };
@@ -20,7 +19,7 @@ export class GameEngine {
   /** 游戏重启时的回调（由 main.ts 设置为 game.restart） */
   public onRestart: (() => void) | null = null;
   private restartTimer: number | null = null;
-  private practiceMode: boolean = false;
+  private speedMultiplier: number = 1.0;
 
   constructor(config?: Partial<GameConfig>) {
     this.config = {
@@ -31,15 +30,12 @@ export class GameEngine {
       practiceMode: false,
       ...config
     };
-    this.lives = this.config.maxLives ?? 3;
-    this.practiceMode = this.config.practiceMode ?? false;
     this.soundManager = new SoundManager();
   }
 
   start(): void {
     this.state = GameState.PLAYING;
     this.score = 0;
-    this.lives = this.config.maxLives ?? 3;
     this.combo = 0;
     console.log('Game started');
   }
@@ -69,28 +65,10 @@ export class GameEngine {
     return { pos: this.lastSlicePos, time: this.lastSliceTime };
   }
 
-  loseLife(): void {
-    if (this.practiceMode) {
-      return;
-    }
-
-    this.lives--;
-    this.soundManager.play('life_lost');
-
-    if (this.lives <= 0) {
-      this.gameOver();
-    }
-  }
-
   private gameOver(): void {
-    if (this.practiceMode) {
-      return;
-    }
-
     this.state = GameState.GAME_OVER;
     this.soundManager.play('game_over');
     console.log(`Game Over! Final Score: ${this.score}`);
-
     this.restartTimer = window.setTimeout(() => {
       this.restart();
     }, 5000);
@@ -108,26 +86,12 @@ export class GameEngine {
     }
   }
 
-  setPracticeMode(enabled: boolean): void {
-    this.practiceMode = enabled;
-    if (enabled) {
-      this.lives = 999;
-    } else {
-      this.lives = this.config.maxLives ?? 3;
-    }
-  }
-
-  isPracticeMode(): boolean {
-    return this.practiceMode;
-  }
-
   restart(): void {
     if (this.restartTimer !== null) {
       clearTimeout(this.restartTimer);
       this.restartTimer = null;
     }
     this.score = 0;
-    this.lives = this.config.maxLives ?? 3;
     this.combo = 0;
     this.lastSliceTime = 0;
     this.lastSlicePos = { x: 0, y: 0 };
@@ -140,16 +104,27 @@ export class GameEngine {
     return this.score;
   }
 
-  getLives(): number {
-    return this.lives;
-  }
-
   getState(): GameState {
     return this.state;
   }
 
   getCombo(): number {
     return this.combo;
+  }
+
+  /** 直接设置分数（通用） */
+  setScore(score: number): void {
+    this.score = score;
+  }
+
+  /** 设置速度倍率 */
+  setSpeedMultiplier(mult: number): void {
+    this.speedMultiplier = mult;
+  }
+
+  /** 获取速度倍率 */
+  getSpeedMultiplier(): number {
+    return this.speedMultiplier;
   }
 
   destroy(): void {
