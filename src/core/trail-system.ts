@@ -49,7 +49,7 @@ export class TrailSystem {
     if (last) {
       const dx = x - last.x;
       const dy = y - last.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dist = Math.hypot(dx, dy);
       const step = this.config.interpolateStep;
       if (dist > step) {
         const steps = Math.floor(dist / step);
@@ -127,9 +127,11 @@ export class TrailSystem {
   }
 
   private getOrCreateState(id: string): PartTrailState {
-    if (!this.trails.has(id)) {
-      this.trails.set(id, { points: [] });
+    let state = this.trails.get(id);
+    if (!state) {
+      state = { points: [] };
+      this.trails.set(id, state);
     }
-    return this.trails.get(id)!;
+    return state;
   }
 }

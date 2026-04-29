@@ -48,22 +48,13 @@ export class SlicingSystem {
     // 保存上一帧位置，供本次 checkSlice 使用
     this.currentFramePrev = new Map(this.prevPositions);
 
-    // 更新 prevPositions 为当前帧坐标（供下一帧使用）
+    // 更新 prevPositions 与轨迹（合并为一循环）
     for (const [id, part] of Object.entries(motionResult.parts)) {
-      if (part.detected && part.position) {
-        const x = (1 - part.position.x) * canvasWidth;
-        const y = part.position.y * canvasHeight;
-        this.prevPositions.set(id, { x, y });
-      }
-    }
-
-    // 更新轨迹（仅作渲染）
-    for (const [id, part] of Object.entries(motionResult.parts)) {
-      if (part.detected) {
-        const x = (1 - part.position.x) * canvasWidth;
-        const y = part.position.y * canvasHeight;
-        this.trailSystem.updateTrail(id, x, y);
-      }
+      if (!part.detected || !part.position) continue;
+      const x = (1 - part.position.x) * canvasWidth;
+      const y = part.position.y * canvasHeight;
+      this.prevPositions.set(id, { x, y });
+      this.trailSystem.updateTrail(id, x, y);
     }
   }
 

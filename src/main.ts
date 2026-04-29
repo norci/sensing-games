@@ -170,7 +170,7 @@ class GameApp {
           if (currTip && prevTip) {
             const dx = -(currTip.x - prevTip.x);
             const dy =   currTip.y - prevTip.y;
-            const len = Math.sqrt(dx * dx + dy * dy);
+            const len = Math.hypot(dx, dy);
             if (len > 0.001) {
               dirX = dx / len;
               dirY = dy / len;

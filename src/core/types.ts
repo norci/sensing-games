@@ -73,19 +73,19 @@ export interface MotionAnalyzerConfig {
 
 /** 默认双手配置（tipIdx 改为手部指点，非腕关节） */
 export const DEFAULT_HAND_CONFIGS: BodyPartConfig[] = [
-  { id: 'leftHand',  tipIdx: 19, midIdx: 13, rootIdx: 11, minVelocity: 2.0 },
-  { id: 'rightHand', tipIdx: 20, midIdx: 14, rootIdx: 12, minVelocity: 2.0 },
+  { id: 'leftHand',  tipIdx: 19, midIdx: 13, rootIdx: 11, minVelocity: 1.5 },
+  { id: 'rightHand', tipIdx: 20, midIdx: 14, rootIdx: 12, minVelocity: 1.5 },
 ];
 
 /** 头部配置：用估算的头顶坐标（鼻子向上延伸） */
 export const DEFAULT_HEAD_CONFIGS: BodyPartConfig[] = [
-  { id: 'head', tipIdx: 0, midIdx: 0, rootIdx: 0, skipAngle: true, isHead: true, minVelocity: 1.0 },
+  { id: 'head', tipIdx: 0, midIdx: 0, rootIdx: 0, skipAngle: true, isHead: true, minVelocity: 1 },
 ];
 
 /** 默认双脚配置（使用脚尖坐标） */
 export const DEFAULT_FOOT_CONFIGS: BodyPartConfig[] = [
-  { id: 'leftFoot',  tipIdx: 31, midIdx: 27, rootIdx: 23, minVelocity: 2.5 },
-  { id: 'rightFoot', tipIdx: 32, midIdx: 28, rootIdx: 24, minVelocity: 2.5 },
+  { id: 'leftFoot',  tipIdx: 31, midIdx: 27, rootIdx: 23, minVelocity: 1.5 },
+  { id: 'rightFoot', tipIdx: 32, midIdx: 28, rootIdx: 24, minVelocity: 1.5 },
 ];
 
 /** 肘部配置：tip=肘关节本身，检测肘部运动 */

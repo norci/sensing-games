@@ -18,9 +18,7 @@ export interface Circle {
 
 // 计算两点距离
 export function distance(p1: Point, p2: Point): number {
-  const dx = p1.x - p2.x;
-  const dy = p1.y - p2.y;
-  return Math.sqrt(dx * dx + dy * dy);
+  return Math.hypot(p1.x - p2.x, p1.y - p2.y);
 }
 
 // 计算线段与圆的碰撞
@@ -92,5 +90,5 @@ export function pointToLineDistance(
   const projX = lineStart.x + t * dx;
   const projY = lineStart.y + t * dy;
   
-  return Math.sqrt((point.x - projX) ** 2 + (point.y - projY) ** 2);
+  return Math.hypot(point.x - projX, point.y - projY);
 }

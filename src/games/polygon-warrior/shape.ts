@@ -3,20 +3,14 @@ import type { LaunchParams } from './launch/types.js';
 
 export type ShapeKind = 'polygon' | 'bomb' | 'freeze';
 
-interface ShapeConfig {
+interface ShapeDef {
   kind: ShapeKind;
-  fillColor: string;
-  strokeColor: string;
+  colors: { fillColor: string; strokeColor: string }[];
+  weight: number;
 }
 
-const SHAPE_CONFIGS: Record<ShapeKind, ShapeConfig> = {
-  polygon: { kind: 'polygon', fillColor: '#FF6B6B', strokeColor: '#8B0000' },
-  bomb:   { kind: 'bomb',    fillColor: '#1a1a1a', strokeColor: '#FF0000' },
-  freeze: { kind: 'freeze',  fillColor: '#00BFFF', strokeColor: '#FFFFFF' },
-};
-
-// 8种颜色用于普通多边形
-const POLYGON_COLORS = [
+// ── 多边形共用配色池（定义一次，所有多边形项共用引用）──
+const POLYGON_PALETTE = [
   { fillColor: '#DC143C', strokeColor: '#8B0000' },
   { fillColor: '#FFB7C5', strokeColor: '#FF69B4' },
   { fillColor: '#FFD700', strokeColor: '#DAA520' },
@@ -25,6 +19,20 @@ const POLYGON_COLORS = [
   { fillColor: '#00CED1', strokeColor: '#008B8B' },
   { fillColor: '#FF8C00', strokeColor: '#CC5500' },
   { fillColor: '#32CD32', strokeColor: '#006400' },
+];
+
+// ── 统一配置：数组下标即边数 ──
+//   0=bomb, 1=freeze, 2=保留, 3~8=多边形
+const SHAPE_DEFS: ShapeDef[] = [
+  { kind: 'bomb',    colors: [{ fillColor: '#1a1a1a', strokeColor: '#FF0000' }], weight: 0.01 },  // 0
+  { kind: 'freeze',  colors: [{ fillColor: '#00BFFF', strokeColor: '#FFFFFF' }], weight: 0.02 },  // 1
+  { kind: 'polygon', colors: POLYGON_PALETTE,                                     weight: 0 },      // 2: reserved
+  { kind: 'polygon', colors: POLYGON_PALETTE,                                     weight: 1/9 },    // 3
+  { kind: 'polygon', colors: POLYGON_PALETTE,                                     weight: 1/16 },   // 4
+  { kind: 'polygon', colors: POLYGON_PALETTE,                                     weight: 1/25 },   // 5
+  { kind: 'polygon', colors: POLYGON_PALETTE,                                     weight: 1/36 },   // 6
+  { kind: 'polygon', colors: POLYGON_PALETTE,                                     weight: 1/49 },   // 7
+  { kind: 'polygon', colors: POLYGON_PALETTE,                                     weight: 1/64 },   // 8
 ];
 
 /** 绘制正多边形 */
@@ -55,7 +63,7 @@ export class Shape {
   public vx: number;
   public vy: number;
   private gravity: number;
-  public readonly config: ShapeConfig;
+  public readonly config: { kind: ShapeKind; fillColor: string; strokeColor: string };
   public isSliced = false;
   public isMissed = false;
   private readonly canvasHeight: number;
@@ -63,7 +71,7 @@ export class Shape {
 
   /** 分数 = 边数 */
   public readonly rawScore: number;
-  /** 边数 ∈ [3, 8]；bomb/freeze = 0（画圆） */
+  /** 边数：0=bomb, 1=freeze, 2=保留, 3~8=多边形（画正多边形） */
   public readonly sides: number;
   /** 渲染半径 */
   public readonly radius: number;
@@ -78,47 +86,32 @@ export class Shape {
     this.vy = launchParams.velocity.vy;
     this.gravity = launchParams.gravity;
 
-    this.config = this.chooseConfig();
-
-    // ── 边数：按 1/sides² 加权随机选择 ──
-    if (this.config.kind === 'bomb' || this.config.kind === 'freeze') {
-      this.sides = 0;
-      this.rawScore = 0;
-    } else {
-      // 1/sides² 权重：sides=3→1/9, 4→1/16, 5→1/25, 6→1/36, 7→1/49, 8→1/64
-      const w = [1/9, 1/16, 1/25, 1/36, 1/49, 1/64];
-      const total = w.reduce((a, b) => a + b, 0);
-      let r = Math.random() * total;
-      let chosen = 0;
-      for (let i = 0; i < w.length; i++) {
-        r -= w[i];
-        if (r <= 0) {
-          chosen = i;
-          break;
-        }
+    // ── 边数：加权随机，数组下标即边数 ──
+    const total = SHAPE_DEFS.reduce((sum, d) => sum + d.weight, 0);
+    let r = Math.random() * total;
+    this.sides = 0;
+    for (let i = 0; i < SHAPE_DEFS.length; i++) {
+      r -= SHAPE_DEFS[i].weight;
+      if (r <= 0) {
+        this.sides = i;
+        break;
       }
-      this.sides = chosen + 3;
-      this.rawScore = this.sides;
     }
 
-    // ── 统一半径 ──
-    this.radius = 42;
+    // ── 配置：从颜色池随机取色 ──
+    const def = SHAPE_DEFS[this.sides];
+    const c = def.colors[Math.floor(Math.random() * def.colors.length)];
+    this.config = { kind: def.kind, ...c };
 
-    // ── 速度：与边数成正比 ──
-    const speedMul = 0.5 + (this.sides / 8) * 0.7;
+    this.rawScore = this.sides >= 3 ? this.sides : 0;
+
+    // ── 统一半径 ──
+    this.radius = 64;
+
+    // ── 速度：多边形与边数成正比；特殊形状固定 0.5 ──
+    const speedMul = this.sides >= 3 ? 0.5 + (this.sides / 8) * 0.5 : 0.5;
     this.vx *= speedMul;
     this.vy *= speedMul;
-  }
-
-  private chooseConfig(): ShapeConfig {
-    const r = Math.random();
-    if (r < 0.05) return { ...SHAPE_CONFIGS['bomb'] };
-    if (r < 0.13) return { ...SHAPE_CONFIGS['freeze'] };
-    return { ...SHAPE_CONFIGS['polygon'], ...this.chooseColor() };
-  }
-
-  private chooseColor(): { fillColor: string; strokeColor: string } {
-    return POLYGON_COLORS[Math.floor(Math.random() * POLYGON_COLORS.length)];
   }
 
   update(): void {
@@ -143,7 +136,7 @@ export class Shape {
     const r = this.radius;
 
     // ── 绘制形状 ──
-    if (this.sides === 0) {
+    if (this.sides < 3) {
       ctx.beginPath();
       ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
     } else {

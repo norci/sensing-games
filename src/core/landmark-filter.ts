@@ -26,8 +26,8 @@ export class LandmarkFilter {
   private readonly minAlpha: number;
 
   constructor(options: LandmarkFilterOptions = {}) {
-    this.maxSpeed = options.maxSpeed ?? 1.5;
-    this.minAlpha = options.minAlpha ?? 0.05;
+    this.maxSpeed = options.maxSpeed ?? 3;
+    this.minAlpha = options.minAlpha ?? 0.01;
   }
 
   /**

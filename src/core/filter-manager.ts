@@ -75,7 +75,7 @@ export class FilterManager {
             const dx = curr.x - prev.x;
             const dy = curr.y - prev.y;
             const dz = curr.z - prev.z;
-            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            const dist = Math.hypot(dx, dy, dz);
             speeds[i] = dist / dt;
           } else {
             speeds[i] = 0;

@@ -91,35 +91,21 @@ export class MotionAnalyzer {
     const rootN = normLandmarks[cfg.rootIdx];
 
     // visibility 唯 normLandmarks 有之，worldLandmarks 无此字段
-    const tipNvis = normLandmarks[cfg.tipIdx];
-    const midNvis = normLandmarks[cfg.midIdx];
-    const rootNvis = normLandmarks[cfg.rootIdx];
-    const visOk = (lm: any) => lm ? (lm.visibility ?? 0) >= 0.5 : true;
-    if (!tipW || !midW || !rootW || !visOk(tipNvis) || !visOk(midNvis) || !visOk(rootNvis)) {
+    const visOk = (lm: any) => !lm || (lm.visibility ?? 0) >= 0.5;
+    if (!tipW || !midW || !rootW || !visOk(tipN) || !visOk(midN) || !visOk(rootN)) {
       return this.emptyPartResult(cfg.id);
     }
 
     // --- rendering position: use normalized coords ---
-    let tipPos: Point;
-    if (cfg.isHead && topHeadNorm) {
-      tipPos = topHeadNorm;
-    } else {
-      tipPos = { x: tipN.x, y: tipN.y };
-    }
+    const tipPos = (cfg.isHead && topHeadNorm)
+      ? topHeadNorm
+      : { x: tipN.x, y: tipN.y };
 
     // --- velocity: use world coords (meters) ---
-    let velX: number, velY: number, velZ: number;
-    if (cfg.isHead) {
-      // 头顶用绝对坐标（tipIdx == rootIdx == 0，相对坐标恒为0）
-      velX = tipW.x ?? 0;
-      velY = tipW.y ?? 0;
-      velZ = tipW.z ?? 0;
-    } else {
-      velX = (tipW.x ?? 0) - (rootW.x ?? 0);
-      velY = (tipW.y ?? 0) - (rootW.y ?? 0);
-      velZ = (tipW.z ?? 0) - (rootW.z ?? 0);
-    }
-    const velocity = this.calcVelocity(velX, velY, velZ, cfg.id);
+    const dx = (tipW.x ?? 0) - (cfg.isHead ? 0 : rootW.x ?? 0);
+    const dy = (tipW.y ?? 0) - (cfg.isHead ? 0 : rootW.y ?? 0);
+    const dz = (tipW.z ?? 0) - (cfg.isHead ? 0 : rootW.z ?? 0);
+    const velocity = this.calcVelocity(dx, dy, dz, cfg.id);
 
     // --- angle: use normalized coords (unit-less) ---
     const angle = this.calcAngle(rootN, midN, tipN);
@@ -130,13 +116,12 @@ export class MotionAnalyzer {
     if (cfg.skipAngle || cfg.isHead) {
       const enterThreshold = partMinVel * 1.2;
       const exitThreshold = partMinVel * 0.8;
-      const hasMotion = velocity > (state.isBigSwing ? exitThreshold : enterThreshold);
-      state.isBigSwing = hasMotion;
+      state.isBigSwing = velocity > (state.isBigSwing ? exitThreshold : enterThreshold);
 
       return {
         id: cfg.id,
         detected: true,
-        isBigSwing: hasMotion,
+        isBigSwing: state.isBigSwing,
         isKnocking: false,
         velocity,
         angle: 0,
@@ -146,23 +131,13 @@ export class MotionAnalyzer {
 
     let isBigSwing: boolean;
     if (cfg.invertAngle) {
-      const enterThreshold = partMinVel;
       const exitThreshold = partMinVel * 0.5;
-      const hasMotion = velocity > enterThreshold;
-      if (state.isBigSwing) {
-        isBigSwing = velocity > exitThreshold;
-      } else {
-        isBigSwing = hasMotion;
-      }
+      isBigSwing = velocity > (state.isBigSwing ? exitThreshold : partMinVel);
     } else {
       const swingEnter = this.analyzerConfig.minAngle + 5;
       const swingExit  = this.analyzerConfig.minAngle - 5;
-      const hasMotion = velocity > partMinVel;
-      if (state.isBigSwing) {
-        isBigSwing = angle > swingExit && hasMotion;
-      } else {
-        isBigSwing = angle > swingEnter && hasMotion;
-      }
+      const angleThreshold = state.isBigSwing ? swingExit : swingEnter;
+      isBigSwing = angle > angleThreshold && velocity > partMinVel;
     }
 
     state.isBigSwing = isBigSwing;
@@ -197,12 +172,11 @@ export class MotionAnalyzer {
     const dt = (performance.now() - state.lastTimestamp) / 1000;
     if (dt === 0) return 0;
 
-    const dx = relX - state.lastRelPos.x;
-    const dy = relY - state.lastRelPos.y;
-    const dz = relZ - state.lastRelZ;
-    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    // 死区：变化小于 Xmm 视为静止（抑 MediaPipe 微颤）
-    const velocity = distance < 0.05 ? 0 : distance / dt;
+    const velocity = Math.hypot(
+      relX - state.lastRelPos.x,
+      relY - state.lastRelPos.y,
+      relZ - state.lastRelZ,
+    ) / dt;
 
     state.velocityHistory.push(velocity);
     if (state.velocityHistory.length > this.analyzerConfig.historySize) {
@@ -220,8 +194,8 @@ export class MotionAnalyzer {
     const v1 = { x: root.x - mid.x, y: root.y - mid.y };
     const v2 = { x: tip.x - mid.x, y: tip.y - mid.y };
     const dot = v1.x * v2.x + v1.y * v2.y;
-    const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
-    const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+    const mag1 = Math.hypot(v1.x, v1.y);
+    const mag2 = Math.hypot(v2.x, v2.y);
     if (mag1 === 0 || mag2 === 0) return 0;
     const cosAngle = Math.max(-1, Math.min(1, dot / (mag1 * mag2)));
     return Math.acos(cosAngle) * 180 / Math.PI;
