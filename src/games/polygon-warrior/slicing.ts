@@ -20,7 +20,7 @@ const TRAIL_COLORS: Record<string, { prefix: string; hex: string }> = {
 const SLICEABLE_PARTS: BodyPartId[] = ['leftHand', 'rightHand', 'leftFoot', 'rightFoot'];
 
 /** 切割判定厚度（像素） */
-const SLICE_THICKNESS = 8;
+const SLICE_THICKNESS = 12;
 
 export class SlicingSystem {
   private trailSystem: TrailSystem;
@@ -28,8 +28,14 @@ export class SlicingSystem {
   private prevPositions: Map<string, { x: number; y: number }> = new Map();
   /** 当前帧的上一帧位置（在 updateTrail 开头保存） */
   private currentFramePrev: Map<string, { x: number; y: number }> = new Map();
+  /** 历史位置队列（用于方向一致性检测），每个部位保存最近 N 帧位置 */
+  private historyQueue: Map<string, { x: number; y: number; timestamp: number }[]> = new Map();
   private canvasW = 0;
   private canvasH = 0;
+  /** 历史队列最大长度（约 200ms 历史，30fps 下约 6 帧） */
+  private readonly HISTORY_LENGTH = 6;
+  /** 方向一致性阈值（余弦值），大于此值视为方向一致 */
+  private readonly DIRECTION_CONSISTENCY_THRESHOLD = 0.7;
 
   constructor() {
     this.trailSystem = new TrailSystem();
@@ -48,13 +54,26 @@ export class SlicingSystem {
     // 保存上一帧位置，供本次 checkSlice 使用
     this.currentFramePrev = new Map(this.prevPositions);
 
-    // 更新 prevPositions 与轨迹（合并为一循环）
+    // 更新 prevPositions、历史队列与轨迹（合并为一循环）
+    const now = performance.now();
     for (const [id, part] of Object.entries(motionResult.parts)) {
       if (!part.detected || !part.position) continue;
       const x = (1 - part.position.x) * canvasWidth;
       const y = part.position.y * canvasHeight;
       this.prevPositions.set(id, { x, y });
       this.trailSystem.updateTrail(id, x, y);
+      
+      // 更新历史队列
+      let queue = this.historyQueue.get(id);
+      if (!queue) {
+        queue = [];
+        this.historyQueue.set(id, queue);
+      }
+      queue.push({ x, y, timestamp: now });
+      // 保持队列长度不超过 HISTORY_LENGTH
+      if (queue.length > this.HISTORY_LENGTH) {
+        queue.shift();
+      }
     }
   }
 
@@ -82,7 +101,22 @@ export class SlicingSystem {
       // 检测二：上一帧至当前帧之线段穿过圆形（扫掠检测）
       const prev = this.currentFramePrev.get(partId);
       if (prev) {
-        const isSliced = lineCircleIntersect(prev, { x: currX, y: currY }, shapeCircle);
+        // 方向一致性检测：区分抖动与真实动作
+        const history = this.historyQueue.get(partId);
+        if (history && history.length >= 3) {
+          if (!this.checkDirectionConsistency(history, prev, { x: currX, y: currY })) {
+            continue; // 方向不一致，可能为抖动，跳过此帧
+          }
+        }
+        
+        // 快速动作补偿：扩大扫掠厚度
+        const expandedCircle = {
+          x: shapeCircle.x,
+          y: shapeCircle.y,
+          radius: shapeCircle.radius + SLICE_THICKNESS
+        };
+        
+        const isSliced = lineCircleIntersect(prev, { x: currX, y: currY }, expandedCircle);
         if (isSliced) return true;
 
         const dist = pointToLineDistance(
@@ -103,9 +137,36 @@ export class SlicingSystem {
     });
   }
 
+  private checkDirectionConsistency(
+    history: { x: number; y: number; timestamp: number }[],
+    prev: { x: number; y: number },
+    curr: { x: number; y: number }
+  ): boolean {
+    const dxCurr = curr.x - prev.x;
+    const dyCurr = curr.y - prev.y;
+    const magCurr = Math.hypot(dxCurr, dyCurr);
+    
+    // 位移太小，不足为打击动作，视为无效
+    if (magCurr < 4) return false;
+    
+    // 历史累计位移
+    let dxHist = 0, dyHist = 0;
+    for (let i = 1; i < history.length; i++) {
+      dxHist += history[i].x - history[i-1].x;
+      dyHist += history[i].y - history[i-1].y;
+    }
+    
+    const magHist = Math.hypot(dxHist, dyHist);
+    if (magHist < 4) return true; // 历史位移小，无明确方向，但当前帧位移大，视为有效
+    
+    const cosine = (dxCurr * dxHist + dyCurr * dyHist) / (magCurr * magHist);
+    return cosine > this.DIRECTION_CONSISTENCY_THRESHOLD;
+  }
+
   reset(): void {
     this.trailSystem.clearAll();
     this.prevPositions.clear();
     this.currentFramePrev.clear();
+    this.historyQueue.clear();
   }
 }
