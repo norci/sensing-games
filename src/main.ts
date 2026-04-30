@@ -21,15 +21,15 @@ class GameApp {
   private game: IGameMode;
   private hud: HUD;
   private poseRenderer: PoseRenderer;
-  private gameLoop: GameLoop;
+  private gameLoop!: GameLoop;
   private gameCanvas: HTMLCanvasElement;
   private presenceMonitor: PersonPresenceMonitor;
 
   // 状态
   private latestFiltered: any[] | null = null;
+  private prevRaw: any[] | null = null;
   private partConfigs: typeof DEFAULT_BODY_CONFIGS;
   private sparkEffect: SparkEffect;
-  private hasEverDetected = false;
 
   constructor() {
     const video = document.getElementById('video') as HTMLVideoElement;
@@ -41,7 +41,7 @@ class GameApp {
     this.partConfigs = DEFAULT_BODY_CONFIGS;
     this.analyzer = new MotionAnalyzer(this.partConfigs);
     this.engine = new GameEngine({ practiceMode: true });
-    this.game = getGameMode('polygon-warrior', this.engine)!;
+    this.game = getGameMode('polygon-warrior', this.engine);
     this.gameCanvas = gameCanvas;
     const hudConfig: HUDConfig = {
       title: '多边形战士',
@@ -66,7 +66,6 @@ class GameApp {
       }
     });
     this.poseRenderer = new PoseRenderer(gameCanvas.getContext('2d')!, video);
-    this.gameLoop = new GameLoop();
 
     this.sparkEffect = new SparkEffect();
 
@@ -77,12 +76,15 @@ class GameApp {
         onPresent: () => {
           this.engine.resume();
           this.filterManager.reset();
-          if (!this.hasEverDetected) {
-            this.hasEverDetected = true;
-          }
+          this.gameLoop.start();
         },
-        onLowFpsNeeded: () => this.cameraMgr.setLowFps(),
-        onNormalFpsNeeded: () => this.cameraMgr.setNormalFps(),
+        onLowFpsNeeded: () => {
+          this.cameraMgr.setLowFps();
+        },
+        onNormalFpsNeeded: async () => {
+          await this.cameraMgr.setNormalFps();
+          this.gameLoop.updateDetectInterval(1000 / this.cameraMgr.getFps());
+        },
       },
     });
 
@@ -90,20 +92,21 @@ class GameApp {
     this.game.init(gameCanvas);
 
     window.addEventListener('resize', () => {
-      this.game?.resize?.();
+      this.game.resize?.();
       this.hud.resize(window.innerWidth, window.innerHeight);
     });
     this.hud.resize(window.innerWidth, window.innerHeight);
-
-    this.gameLoop.onFrame((time: number) => this.renderFrame(time));
-    this.gameLoop.onDetect((time: number) => this.detectFrame(time));
 
     this.cameraMgr.setCallbacks(
       async () => {
         const loading = document.getElementById('loading');
         if (loading) loading.style.display = 'none';
         await this.initDetector();
-        this.startGame();
+        this.gameLoop = new GameLoop(1000 / this.cameraMgr.getFps());
+        this.gameLoop.onFrame(() => this.renderFrame());
+        this.gameLoop.onDetect(() => this.detectFrame());
+        this.engine.start();
+        this.gameLoop.start();
       },
       (msg: string) => this.showError(msg)
     );
@@ -114,91 +117,90 @@ class GameApp {
 
   private async initDetector(): Promise<void> {
     await this.detector.init();
-  }
+    this.detector.onResult((result) => {
+      const rawLandmarks = result.landmarks?.[0] ?? null;
+      this.presenceMonitor.update(rawLandmarks);
 
-  private startGame(): void {
-    this.engine.start();
-    this.gameLoop.start();
-  }
+      if (!this.presenceMonitor.isPresent) {
+        this.latestFiltered = null;
+        this.prevRaw = null;
+        return;
+      }
 
-  private detectFrame(time: number): void {
-    const video = this.cameraMgr.getVideoElement();
-    if (video.readyState < 2) return;
+      // worldLandmarks 可能为空（MediaPipe 偶发不返回）
+      const rawWorld = result.worldLandmarks?.[0];
+      const rawNorm = result.landmarks![0];
+      if (!rawWorld) return;
 
-    if (this.presenceMonitor.isThrottled()) {
-      return;
-    }
+      // 滤波数据仅用于渲染（平滑）
+      const filteredResult = this.filterManager.apply(result);
+      this.latestFiltered = filteredResult.landmarks![0];
 
-    const result = this.detector.detectForVideo(video, time);
-    if (!result) return;
+      // 动作分析用原始数据
+      const motionResult = this.analyzer.analyze(rawWorld, rawNorm);
 
-    // 应用滤波器（含速度计算与自适应 IIR）
-    const filteredResult = this.filterManager.apply(result);
+      // 火花方向用原始数据
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const prev = this.prevRaw;
+      this.prevRaw = rawNorm;
 
-    const landmarks = filteredResult.landmarks?.[0] ?? null;
-    this.presenceMonitor.update(landmarks);
-
-    if (!this.presenceMonitor.isPresent) {
-      this.latestFiltered = null;
-      return;
-    }
-
-    const worldLandmarks = filteredResult.worldLandmarks?.[0] ?? [];
-    const normLandmarks = filteredResult.landmarks?.[0] ?? [];
-
-    const prev = this.latestFiltered;
-    this.latestFiltered = normLandmarks;
-
-    const motionResult = this.analyzer.analyze(worldLandmarks, normLandmarks);
-
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    for (const [id, part] of Object.entries(motionResult.parts)) {
-      if (!part || !part.detected || !part.position) continue;
-      const cfg = this.partConfigs.find(c => c.id === id);
-      const minVel = cfg?.minVelocity ?? 0.3;
-      if (part.velocity > minVel) {
-        const sx = (1 - part.position.x) * w;
-        const sy = part.position.y * h;
-        const count = Math.min(50, Math.max(3, Math.floor(part.velocity * part.velocity * 12)));
-
-        let dirX: number | undefined;
-        let dirY: number | undefined;
-        if (prev && cfg) {
-          const currTip = normLandmarks[cfg.tipIdx];
-          const prevTip = prev[cfg.tipIdx];
-          if (currTip && prevTip) {
-            const dx = -(currTip.x - prevTip.x);
-            const dy =   currTip.y - prevTip.y;
-            const len = Math.hypot(dx, dy);
-            if (len > 0.001) {
-              dirX = dx / len;
-              dirY = dy / len;
+      for (const [id, part] of Object.entries(motionResult.parts)) {
+        if (!part || !part.detected || !part.position) continue;
+        const cfg = this.partConfigs.find(c => c.id === id)!;
+        const minVel = cfg.minVelocity ?? 0.3;
+        if (part.velocity > minVel) {
+          const sx = (1 - part.position.x) * w;
+          const sy = part.position.y * h;
+          const count = Math.min(50, Math.max(3, Math.floor(part.velocity * part.velocity * 12)));
+          let dirX: number | undefined;
+          let dirY: number | undefined;
+          if (prev) {
+            const currTip = rawNorm[cfg.tipIdx];
+            const prevTip = prev[cfg.tipIdx];
+            if (currTip && prevTip) {
+              const dx = -(currTip.x - prevTip.x);
+              const dy = currTip.y - prevTip.y;
+              const len = Math.hypot(dx, dy);
+              if (len > 0.001) {
+                dirX = dx / len;
+                dirY = dy / len;
+              }
             }
           }
+          this.sparkEffect.emit(sx, sy, count, dirX, dirY, part.velocity);
         }
-        this.sparkEffect.emit(sx, sy, count, dirX, dirY, part.velocity);
       }
-    }
 
-    if (this.engine.getState() === GameState.PLAYING) {
-      this.game.update(motionResult);
-    }
+      if (this.engine.getState() === GameState.PLAYING) {
+        this.game.update(motionResult);
+      }
+    });
   }
 
-  private renderFrame(motionResult: any): void {
-    if (this.game) this.game.render();
+  private detectFrame(): void {
+    if (this.presenceMonitor.isThrottled()) return;
+    const video = this.cameraMgr.getVideoElement();
+    if (video.readyState < 2) return;
+    this.detector.feedFrame(video);
+  }
 
-    if (this.latestFiltered && this.poseRenderer) {
+  private renderFrame(): void {
+    if (this.engine.getState() === GameState.PLAYING) {
+      this.game.tick();
+    }
+    this.game.render();
+
+    if (this.latestFiltered) {
       this.poseRenderer.render(this.latestFiltered, window.innerWidth, window.innerHeight);
       this.poseRenderer.renderPartHighlight(this.latestFiltered, window.innerWidth, window.innerHeight);
     }
 
     this.sparkEffect.update();
-    const ctx = this.gameCanvas.getContext('2d');
-    if (ctx) this.sparkEffect.render(ctx);
+    const ctx = this.gameCanvas.getContext('2d')!;
+    this.sparkEffect.render(ctx);
 
-    this.hud.render(this.engine, motionResult || undefined);
+    this.hud.render(this.engine);
   }
 
   private showError(message: string): void {

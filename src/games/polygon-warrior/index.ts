@@ -11,8 +11,8 @@ export class PolygonWarriorGame implements IGameMode {
   readonly name = 'Polygon Warrior';
   readonly description = '切多边形，避开炸弹！';
 
-  private canvas: HTMLCanvasElement | null = null;
-  private ctx: CanvasRenderingContext2D | null = null;
+  private canvas!: HTMLCanvasElement;
+  private ctx!: CanvasRenderingContext2D;
   private shapes: Shape[] = [];
   private slicingSystem: SlicingSystem = new SlicingSystem();
   private particleSystem: FragmentParticleSystem = new FragmentParticleSystem();
@@ -30,13 +30,12 @@ export class PolygonWarriorGame implements IGameMode {
 
   init(canvas: HTMLCanvasElement, glCanvas?: HTMLCanvasElement): void {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
+    this.ctx = canvas.getContext('2d')!;
     this.resize();
     console.log('PolygonWarriorGame initialized');
   }
 
   resize(): void {
-    if (!this.canvas) return;
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
   }
@@ -66,8 +65,6 @@ export class PolygonWarriorGame implements IGameMode {
   }
 
   checkSlice(motionResult: MotionResult): void {
-    if (!this.canvas) return;
-
     for (let i = this.shapes.length - 1; i >= 0; i--) {
       const shape = this.shapes[i];
 
@@ -103,18 +100,19 @@ export class PolygonWarriorGame implements IGameMode {
   }
 
   update(motionResult: MotionResult): void {
-    this.updatePhysics();
-    this.particleSystem.update();
-
     if (motionResult.isBigSwing) {
-      this.slicingSystem.updateTrail(motionResult, this.canvas!.width, this.canvas!.height);
+      this.slicingSystem.updateTrail(motionResult, this.canvas.width, this.canvas.height);
       this.checkSlice(motionResult);
     }
   }
 
+  tick(): void {
+    this.updatePhysics();
+    this.particleSystem.update();
+  }
+
   render(ctx?: CanvasRenderingContext2D, gl?: WebGL2RenderingContext): void {
     const context = ctx || this.ctx;
-    if (!context || !this.canvas) return;
 
     context.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -128,13 +126,11 @@ export class PolygonWarriorGame implements IGameMode {
     if (timeSinceBombHit < 1000) {
       const opacity = 0.6 * (1 - timeSinceBombHit / 1000);
       context.fillStyle = `rgba(0, 0, 0, ${opacity})`;
-      context.fillRect(0, 0, this.canvas!.width, this.canvas!.height);
+      context.fillRect(0, 0, this.canvas.width, this.canvas.height);
     }
   }
 
   private spawnShape(speedMultiplier: number): void {
-    if (!this.canvas) return;
-
     const launchParams = this.launchStrategy.generate(
       this.canvas.width,
       this.canvas.height,
@@ -146,7 +142,6 @@ export class PolygonWarriorGame implements IGameMode {
   }
 
   private renderHUD(ctx: CanvasRenderingContext2D): void {
-    if (!this.canvas) return;
     const w = this.canvas.width;
     const h = this.canvas.height;
 

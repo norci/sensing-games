@@ -37,13 +37,8 @@ export class FilterManager {
    * @returns 滤波后之结果（直接修改原对象，因 detectForVideo 每次返回新对象）
    */
   apply(result: PoseLandmarkerResult): PoseLandmarkerResult {
-    if (!result.worldLandmarks || !result.landmarks) {
-      return result;
-    }
-
-    const world = result.worldLandmarks[0];
-    const norms = result.landmarks[0];
-    if (!world || !norms) return result;
+    const world = result.worldLandmarks![0];
+    const norms = result.landmarks![0];
 
     // 计算速度（米/秒）
     const speeds = this.calcSpeeds(world);

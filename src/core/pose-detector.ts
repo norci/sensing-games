@@ -1,92 +1,89 @@
-import { FilesetResolver, PoseLandmarker, PoseLandmarkerResult } from '@mediapipe/tasks-vision';
-import { getWasmPath } from '../shared/network-utils.js';
+import { PoseLandmarkerResult } from '@mediapipe/tasks-vision';
 
 export interface PoseDetectorConfig {
   modelPath?: string;
-  wasmPath?: string;
   delegate?: 'CPU' | 'GPU';
-  runningMode?: 'IMAGE' | 'VIDEO';
   numPoses?: number;
   outputWorldLandmarks?: boolean;
 }
 
 export class PoseDetector {
-  private landmarker: PoseLandmarker | null = null;
+  private worker!: Worker;
   private isInitialized = false;
-  private onPoseDetected?: (result: PoseLandmarkerResult) => void;
+  private initPromise!: Promise<void>;
   private config: Required<PoseDetectorConfig>;
-  private lastTs = 0; // 时间戳单调递增保护
+  private resultCallback!: (result: PoseLandmarkerResult) => void;
 
   constructor(config?: PoseDetectorConfig) {
     this.config = {
       modelPath: '/models/pose_landmarker_lite.task',
-      wasmPath: getWasmPath(),
-      delegate: this.isMobile() ? 'CPU' : 'GPU',
-      runningMode: 'VIDEO',
+      delegate: 'GPU',
       numPoses: 1,
       outputWorldLandmarks: true,
       ...config
     };
   }
 
-  private isMobile(): boolean {
-    return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  }
-
   async init(): Promise<void> {
-    try {
-      const vision = await FilesetResolver.forVisionTasks(this.config.wasmPath!);
-      this.landmarker = await PoseLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: this.config.modelPath!,
-          delegate: this.config.delegate
-        },
-        runningMode: 'VIDEO',
-        numPoses: this.config.numPoses!,
-        outputSegmentationMasks: false,
+    if (this.isInitialized) return;
+    this.initPromise = this.initWorker();
+    return this.initPromise;
+  }
+
+  private initWorker(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      this.worker = new Worker(new URL('./pose-landmarker.worker.ts', import.meta.url), { type: 'module' });
+
+      this.worker.onmessage = (event: MessageEvent) => {
+        const { type } = event.data;
+        if (type === 'INIT_DONE') {
+          this.isInitialized = true;
+          console.log('PoseDetector worker initialized');
+          resolve();
+        } else if (type === 'DETECT_RESULT') {
+          this.resultCallback(event.data.result);
+        } else if (type === 'DETECT_ERROR') {
+          console.error('Detection error:', event.data.error);
+        }
+      };
+
+      this.worker.onerror = (error: Event) => {
+        console.error('Worker error:', error);
+        reject(error);
+      };
+
+      this.worker.postMessage({
+        type: 'INIT',
+        modelAssetPath: this.config.modelPath,
+        delegate: this.config.delegate,
         minPoseDetectionConfidence: 0.7,
+        minPosePresenceConfidence: 0.7,
         minTrackingConfidence: 0.7,
+        numPoses: this.config.numPoses,
+        outputSegmentationMasks: false,
       });
-      this.isInitialized = true;
-      console.log(`PoseDetector initialized with ${this.config.delegate} delegate`);
-    } catch (error) {
-      console.error('Failed to initialize PoseDetector:', error);
-      throw error;
-    }
+
+      setTimeout(() => {
+        if (!this.isInitialized) {
+          reject(new Error('PoseDetector worker init timeout'));
+        }
+      }, 15000);
+    });
   }
 
-  /**
-   * 时间戳单调递增保护：
-   * MediaPipe 要求时间戳严格递增。applyConstraints 改变帧率後易出现 timestamp mismatch。
-   * 此处用 performance.now() 产生单调递增微秒时间戳，不依赖视频时间戳。
-   */
-  detectForVideo(video: HTMLVideoElement, _videoTs: number): PoseLandmarkerResult | null {
-    if (!this.isInitialized || !this.landmarker) return null;
-
-    // 用 performance.now() 产生单调递增微秒时间戳
-    const nowUs = Math.floor(performance.now() * 1000);
-    const safeTs = Math.max(nowUs, this.lastTs + 1);
-    this.lastTs = safeTs;
-
-    try {
-      const result = this.landmarker.detectForVideo(video, safeTs);
-      return result;
-    } catch (error) {
-      console.error('Pose detection error:', error);
-      return null;
-    }
+  onResult(callback: (result: PoseLandmarkerResult) => void): void {
+    this.resultCallback = callback;
   }
 
-  setCallback(callback: (result: PoseLandmarkerResult) => void): void {
-    this.onPoseDetected = callback;
+  feedFrame(video: HTMLVideoElement): void {
+    createImageBitmap(video).then(bitmap => {
+      this.worker.postMessage({ type: 'DETECT', bitmap }, [bitmap]);
+    });
   }
 
   destroy(): void {
-    if (this.landmarker) {
-      this.landmarker.close();
-      this.landmarker = null;
-      this.isInitialized = false;
-      this.lastTs = 0;
-    }
+    this.worker.postMessage({ type: 'CLEANUP' });
+    this.worker.terminate();
+    this.isInitialized = false;
   }
 }

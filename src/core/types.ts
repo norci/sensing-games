@@ -73,8 +73,8 @@ export interface MotionAnalyzerConfig {
 
 /** 默认双手配置（tipIdx 改为手部指点，非腕关节） */
 export const DEFAULT_HAND_CONFIGS: BodyPartConfig[] = [
-  { id: 'leftHand',  tipIdx: 19, midIdx: 13, rootIdx: 11, minVelocity: 1.5 },
-  { id: 'rightHand', tipIdx: 20, midIdx: 14, rootIdx: 12, minVelocity: 1.5 },
+  { id: 'leftHand',  tipIdx: 19, midIdx: 13, rootIdx: 11, minVelocity: 1.0 },
+  { id: 'rightHand', tipIdx: 20, midIdx: 14, rootIdx: 12, minVelocity: 1.0 },
 ];
 
 /** 头部配置：用估算的头顶坐标（鼻子向上延伸） */
@@ -84,20 +84,20 @@ export const DEFAULT_HEAD_CONFIGS: BodyPartConfig[] = [
 
 /** 默认双脚配置（使用脚尖坐标） */
 export const DEFAULT_FOOT_CONFIGS: BodyPartConfig[] = [
-  { id: 'leftFoot',  tipIdx: 31, midIdx: 27, rootIdx: 23, minVelocity: 1.5 },
-  { id: 'rightFoot', tipIdx: 32, midIdx: 28, rootIdx: 24, minVelocity: 1.5 },
+  { id: 'leftFoot',  tipIdx: 31, midIdx: 27, rootIdx: 23, minVelocity: 1 },
+  { id: 'rightFoot', tipIdx: 32, midIdx: 28, rootIdx: 24, minVelocity: 1 },
 ];
 
 /** 肘部配置：tip=肘关节本身，检测肘部运动 */
 export const DEFAULT_ELBOW_CONFIGS: BodyPartConfig[] = [
-  { id: 'leftElbow',  tipIdx: 13, midIdx: 13, rootIdx: 11, invertAngle: true, minVelocity: 3 },
-  { id: 'rightElbow', tipIdx: 14, midIdx: 14, rootIdx: 12, invertAngle: true, minVelocity: 3 },
+  { id: 'leftElbow',  tipIdx: 13, midIdx: 13, rootIdx: 11, invertAngle: true, minVelocity: 2 },
+  { id: 'rightElbow', tipIdx: 14, midIdx: 14, rootIdx: 12, invertAngle: true, minVelocity: 2 },
 ];
 
 /** 膝部配置：tip=膝关节本身，检测膝部运动 */
 export const DEFAULT_KNEE_CONFIGS: BodyPartConfig[] = [
-  { id: 'leftKnee',  tipIdx: 25, midIdx: 25, rootIdx: 23, invertAngle: true, minVelocity: 3.0 },
-  { id: 'rightKnee', tipIdx: 26, midIdx: 26, rootIdx: 24, invertAngle: true, minVelocity: 3.0 },
+  { id: 'leftKnee',  tipIdx: 25, midIdx: 25, rootIdx: 23, invertAngle: true, minVelocity: 2 },
+  { id: 'rightKnee', tipIdx: 26, midIdx: 26, rootIdx: 24, invertAngle: true, minVelocity: 2 },
 ];
 
 /** 全部身体部位配置 */
@@ -136,6 +136,9 @@ export interface IGameMode {
   readonly description: string;
 
   init(canvas: HTMLCanvasElement, glCanvas?: HTMLCanvasElement): void;
+  /** 每渲染帧调用（物理 + 粒子） */
+  tick(): void;
+  /** 检测帧调用（动作 + 碰撞） */
   update(motionData: MotionResult): void;
   render(ctx?: CanvasRenderingContext2D, gl?: WebGL2RenderingContext): void;
   destroy(): void;

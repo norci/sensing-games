@@ -45,8 +45,7 @@ export class MotionAnalyzer {
    *  @param worldLandmarks - MediaPipe world landmarks (meters)
    *  @param normLandmarks - MediaPipe normalized landmarks ([0,1])
    */
-  analyze(worldLandmarks: any[], normLandmarks?: any[]): MotionResult {
-    const norms = normLandmarks || worldLandmarks; // fallback
+  analyze(worldLandmarks: any[], normLandmarks: any[]): MotionResult {
     const parts: Partial<Record<string, BodyPartResult>> = {};
     let anyBigSwing = false;
     let anyKnocking = false;
@@ -56,12 +55,12 @@ export class MotionAnalyzer {
     if (worldLandmarks[0] && worldLandmarks[11] && worldLandmarks[12]) {
       topHeadWorld = estimateTopOfHead(worldLandmarks);
     }
-    if (norms[0] && norms[11] && norms[12]) {
-      topHeadNorm = estimateTopOfHead(norms);
+    if (normLandmarks[0] && normLandmarks[11] && normLandmarks[12]) {
+      topHeadNorm = estimateTopOfHead(normLandmarks);
     }
 
     for (const cfg of this.configs) {
-      const result = this.analyzePart(worldLandmarks, norms, cfg, topHeadWorld, topHeadNorm);
+      const result = this.analyzePart(worldLandmarks, normLandmarks, cfg, topHeadWorld, topHeadNorm);
       parts[cfg.id] = result;
       if (result.isBigSwing) anyBigSwing = true;
       if (result.isKnocking) anyKnocking = true;

@@ -28,11 +28,11 @@ export class PoseRenderer {
   private ctx: CanvasRenderingContext2D;
   private landmarkRadius = 4;
   private connectionLineWidth = 1;
-  private video: HTMLVideoElement | null = null;
+  private video!: HTMLVideoElement;
 
-  constructor(ctx: CanvasRenderingContext2D, video?: HTMLVideoElement) {
+  constructor(ctx: CanvasRenderingContext2D, video: HTMLVideoElement) {
     this.ctx = ctx;
-    this.video = video ?? null;
+    this.video = video;
   }
 
   setVideo(video: HTMLVideoElement): void {
@@ -45,7 +45,7 @@ export class PoseRenderer {
     canvasWidth: number, canvasHeight: number
   ): { x: number; y: number } {
     const v = this.video;
-    if (!v || !v.videoWidth || !v.videoHeight) {
+    if (!v.videoWidth || !v.videoHeight) {
       // 无视频信息，回退至简单映射（含镜像）
       return { x: (1 - nx) * canvasWidth, y: ny * canvasHeight };
     }
@@ -70,8 +70,6 @@ export class PoseRenderer {
   }
 
   render(landmarks: NormalizedLandmark[], canvasWidth: number, canvasHeight: number): void {
-    if (!landmarks || landmarks.length === 0) return;
-
     // 绘骨架连线
     this.renderConnections(landmarks, canvasWidth, canvasHeight);
     // 绘关键点
@@ -162,7 +160,6 @@ export class PoseRenderer {
     }
 
     for (const h of highlights) {
-      if (landmarks.length <= h.idx) continue;
       const lm = landmarks[h.idx];
       if (!lm || (lm.visibility ?? 0) < 0.5) continue;
 

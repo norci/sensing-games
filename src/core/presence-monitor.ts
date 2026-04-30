@@ -46,6 +46,8 @@ export class PersonPresenceMonitor {
   private isPausedLowFps: boolean = false;
   private lastSlowCheck: number = 0;
   private isPersonPresent: boolean = true;  // 初始假设有人，使首次无人时立即触发 onAbsent
+  private absentFrameCount: number = 0;
+  private readonly absentThreshold: number = 3;  // 连续 N 帧无人方判定丢失
 
   constructor(config: PresenceMonitorConfig) {
     this.delayMs = config.delayMs ?? 3000;
@@ -61,7 +63,7 @@ export class PersonPresenceMonitor {
    * @param landmarks 当前帧的归一化 landmarks（result.landmarks[0]），可为 null
    *
    * 行为：
-   *   - 无人时立即触发 onAbsent（显示暂停画面）
+   *   - 连续 absentThreshold 帧无人时触发 onAbsent（显示暂停画面）
    *   - 有人时立即触发 onPresent（恢复游戏）
    *   - 无人持续 delayMs 後触发 onLowFpsNeeded（降帧省 CPU）
    *   - 有人时立即触发 onNormalFpsNeeded（恢复帧率）
@@ -72,20 +74,22 @@ export class PersonPresenceMonitor {
 
     if (!hasBody) {
       // 无人
-      if (this.isPersonPresent) {
-        // 刚丢失人体：立即暂停（显示暂停画面），并开始计时（用于降帧延迟）
+      this.absentFrameCount++;
+      if (this.isPersonPresent && this.absentFrameCount >= this.absentThreshold) {
+        // 连续 N 帧无人：暂停（显示暂停画面），并开始计时（用于降帧延迟）
         this.isPersonPresent = false;
         this.noPersonTimer = now;
         this.cb.onAbsent();
       }
       // 延迟降帧（省 CPU）
-      if (!this.isPausedLowFps && (now - this.noPersonTimer) >= this.delayMs) {
+      if (!this.isPausedLowFps && !this.isPersonPresent && (now - this.noPersonTimer) >= this.delayMs) {
         this.cb.onLowFpsNeeded();
         this.isPausedLowFps = true;
         this.lastSlowCheck = now;
       }
     } else {
       // 有人
+      this.absentFrameCount = 0;
       if (!this.isPersonPresent) {
         // 刚检测到人体：立即恢复
         this.isPersonPresent = true;
@@ -138,5 +142,6 @@ export class PersonPresenceMonitor {
     this.isPausedLowFps = false;
     this.isPersonPresent = false;
     this.lastSlowCheck = 0;
+    this.absentFrameCount = this.absentThreshold;
   }
 }

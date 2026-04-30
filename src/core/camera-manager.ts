@@ -4,9 +4,9 @@
 export class CameraManager {
   private video: HTMLVideoElement;
   private cameraPrompt: HTMLElement;
-  private onCameraReady?: () => void;
-  private onCameraFailed?: (msg: string) => void;
-  private videoTrack: MediaStreamTrack | null = null;
+  private onCameraReady!: () => void;
+  private onCameraFailed!: (msg: string) => void;
+  private videoTrack!: MediaStreamTrack;
   private isLowFps = false;
 
   constructor(videoId: string, promptId: string) {
@@ -97,6 +97,10 @@ export class CameraManager {
     } catch (e) {
       console.warn('无法恢复帧率:', e);
     }
+  }
+
+  getFps(): number {
+    return this.videoTrack!.getSettings().frameRate as number;
   }
 
   private showPrompt(): void {

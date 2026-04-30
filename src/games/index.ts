@@ -8,11 +8,10 @@ const gameModes: Record<string, new (...args: any[]) => IGameMode> = {
   'polygon-warrior': PolygonWarriorGame,
 };
 
-export function getGameMode(name: string, ...args: any[]): IGameMode | null {
+export function getGameMode(name: string, ...args: any[]): IGameMode {
   const GameModeClass = gameModes[name];
   if (!GameModeClass) {
-    console.error(`Game mode "${name}" not found`);
-    return null;
+    throw new Error(`Game mode "${name}" not found`);
   }
   return new GameModeClass(...args);
 }

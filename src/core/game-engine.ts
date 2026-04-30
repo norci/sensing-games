@@ -17,7 +17,7 @@ export class GameEngine {
   private readonly config: GameConfig;
   private soundManager: SoundManager;
   /** 游戏重启时的回调（由 main.ts 设置为 game.restart） */
-  public onRestart: (() => void) | null = null;
+  public onRestart!: () => void;
   private restartTimer: number | null = null;
   private speedMultiplier: number = 1.0;
 
@@ -96,7 +96,7 @@ export class GameEngine {
     this.lastSliceTime = 0;
     this.lastSlicePos = { x: 0, y: 0 };
     this.state = GameState.PLAYING;
-    this.onRestart?.();
+    this.onRestart();
     console.log('Game restarted');
   }
 
