@@ -21,5 +21,5 @@ export interface LaunchStrategy {
 /** 发射模式 */
 export type LaunchMode = 'parabolic' | 'multi-direction';
 
-/** 发射方向（不含 top，多边形不从顶部落下）*/
-export type LaunchDirection = 'bottom' | 'left' | 'right';
+/** 发射方向 */
+export type LaunchDirection = 'top' | 'bottom' | 'left' | 'right';
