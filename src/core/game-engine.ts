@@ -112,17 +112,14 @@ export class GameEngine {
     return this.combo;
   }
 
-  /** 直接设置分数（通用） */
   setScore(score: number): void {
     this.score = score;
   }
 
-  /** 设置速度倍率 */
   setSpeedMultiplier(mult: number): void {
     this.speedMultiplier = mult;
   }
 
-  /** 获取速度倍率 */
   getSpeedMultiplier(): number {
     return this.speedMultiplier;
   }

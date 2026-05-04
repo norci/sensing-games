@@ -33,7 +33,6 @@ class PoseLandmarkerWorker extends PoseWorkerBase {
         return;
       }
 
-      // 只保留最新帧，有积压直接丢弃旧帧
       if (this.pendingBitmap) {
         this.pendingBitmap.close();
       }
@@ -49,7 +48,6 @@ class PoseLandmarkerWorker extends PoseWorkerBase {
     const bitmap = this.pendingBitmap;
     this.pendingBitmap = null;
 
-    // 单调递增时间戳：取 performance.now()，若与上一帧相同则 +1
     let timestamp = performance.now();
     if (timestamp <= this.lastTimestamp) {
       timestamp = this.lastTimestamp + 1;

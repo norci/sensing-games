@@ -1,6 +1,5 @@
 import { Point, Circle } from './math-utils.js';
 
-// 重新导出 math-utils 中的碰撞相关函数
 export { lineCircleIntersect, pointToLineDistance } from './math-utils.js';
 
 /**

@@ -1,25 +1,17 @@
 import { NormalizedLandmark } from '../core/types.js';
 
-// MediaPipe Pose 骨架连接定义（33个关键点）
 const POSE_CONNECTIONS: [number, number][] = [
-  // 面部轮廓
   [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8],
   [8, 9], [9, 10],
-  // 左臂
   [11, 13], [13, 15],
-  // 右臂
   [12, 14], [14, 16],
-  // 躯干
   [11, 12], [11, 23], [12, 24], [23, 24],
-  // 左腿
   [23, 25], [25, 27], [27, 29], [29, 31],
-  [27, 31], // 左脚踝到脚趾
-  // 右腿
+  [27, 31],
   [24, 26], [26, 28], [28, 30], [30, 32],
-  [28, 32], // 右脚踝到脚趾
+  [28, 32]
 ];
 
-// 关键点分组（用于不同颜色）
 const LEFT_PARTS = [11, 13, 15, 23, 25, 27, 29, 31];
 const RIGHT_PARTS = [12, 14, 16, 24, 26, 28, 30, 32];
 const TORSO_PARTS = [11, 12, 23, 24];
@@ -39,28 +31,24 @@ export class PoseRenderer {
     this.video = video;
   }
 
-  // 将归一化坐标转为画布坐标（考虑 object-fit: contain 黑边）
   private toCanvasCoords(
     nx: number, ny: number,
     canvasWidth: number, canvasHeight: number
   ): { x: number; y: number } {
     const v = this.video;
     if (!v.videoWidth || !v.videoHeight) {
-      // 无视频信息，回退至简单映射（含镜像）
       return { x: (1 - nx) * canvasWidth, y: ny * canvasHeight };
     }
 
     const vw = v.videoWidth;
     const vh = v.videoHeight;
 
-    // object-fit: contain 之缩放比
     const scale = Math.min(canvasWidth / vw, canvasHeight / vh);
     const displayW = vw * scale;
     const displayH = vh * scale;
     const offsetX = (canvasWidth - displayW) / 2;
     const offsetY = (canvasHeight - displayH) / 2;
 
-    // 镜像翻转（与 CSS transform: scaleX(-1) 对应）
     const mx = 1 - nx;
 
     return {
@@ -70,9 +58,7 @@ export class PoseRenderer {
   }
 
   render(landmarks: NormalizedLandmark[], canvasWidth: number, canvasHeight: number): void {
-    // 绘骨架连线
     this.renderConnections(landmarks, canvasWidth, canvasHeight);
-    // 绘关键点
     this.renderLandmarks(landmarks, canvasWidth, canvasHeight);
   }
 
@@ -90,12 +76,11 @@ export class PoseRenderer {
       const { x: x1, y: y1 } = this.toCanvasCoords(start.x, start.y, canvasWidth, canvasHeight);
       const { x: x2, y: y2 } = this.toCanvasCoords(end.x, end.y, canvasWidth, canvasHeight);
 
-      // 根据部位选择颜色（浅色，适配黑色背景）
-      let color = '#00ff88'; // 浅绿 - 默认
+      let color = '#00ff88';
       if (LEFT_PARTS.includes(startIdx) || LEFT_PARTS.includes(endIdx)) {
-        color = '#00e5ff'; // 浅蓝 - 左半身
+        color = '#00e5ff';
       } else if (RIGHT_PARTS.includes(startIdx) || RIGHT_PARTS.includes(endIdx)) {
-        color = '#ffaa44'; // 浅橙 - 右半身
+        color = '#ffaa44';
       }
 
       this.ctx.strokeStyle = color;
@@ -113,19 +98,17 @@ export class PoseRenderer {
 
       const { x, y } = this.toCanvasCoords(lm.x, lm.y, canvasWidth, canvasHeight);
 
-      // 根据部位选择颜色（浅色，适配黑色背景）
-      let color = '#00ff88'; // 浅绿 - 默认
+      let color = '#00ff88';
       if (i === 0) {
-        color = '#ff4444'; // 浅红 - 鼻子
+        color = '#ff4444';
       } else if (LEFT_PARTS.includes(i)) {
-        color = '#00e5ff'; // 浅蓝 - 左半身
+        color = '#00e5ff';
       } else if (RIGHT_PARTS.includes(i)) {
-        color = '#ffaa44'; // 浅橙 - 右半身
+        color = '#ffaa44';
       } else if (TORSO_PARTS.includes(i)) {
-        color = '#ffff66'; // 浅黄 - 躯干
+        color = '#ffff66';
       }
 
-      // 绘制圆圈（描边）
       this.ctx.strokeStyle = color;
       this.ctx.lineWidth = 1;
       this.ctx.beginPath();
@@ -134,18 +117,16 @@ export class PoseRenderer {
     }
   }
 
-  // 高亮显示活跃的身体部位
   renderPartHighlight(landmarks: NormalizedLandmark[], canvasWidth: number, canvasHeight: number): void {
     const highlights: { idx: number; color: string; label: string; offsetY: number }[] = [
-      { idx: 13, color: '#66d9ff', label: 'LE', offsetY: -20 },  // 左手肘（浅蓝）
-      { idx: 14, color: '#ffbb66', label: 'RE', offsetY: 25  },   // 右手肘（浅橙）
-      { idx: 25, color: '#66ffbb', label: 'LK', offsetY: -20 },   // 左膝（浅绿）
-      { idx: 26, color: '#ff88cc', label: 'RK', offsetY: 25  },   // 右膝（浅粉）
-      { idx: 27, color: '#66ff88', label: 'LF', offsetY: -25 },   // 左脚踝（浅绿）
-      { idx: 28, color: '#ff66aa', label: 'RF', offsetY: 25  },   // 右脚踝（浅粉）
+      { idx: 13, color: '#66d9ff', label: 'LE', offsetY: -20 },
+      { idx: 14, color: '#ffbb66', label: 'RE', offsetY: 25  },
+      { idx: 25, color: '#66ffbb', label: 'LK', offsetY: -20 },
+      { idx: 26, color: '#ff88cc', label: 'RK', offsetY: 25  },
+      { idx: 27, color: '#66ff88', label: 'LF', offsetY: -25 },
+      { idx: 28, color: '#ff66aa', label: 'RF', offsetY: 25  },
     ];
 
-    // 头球圆圈——直接用鼻尖（landmark 0）
     if (landmarks[0] && (landmarks[0].visibility ?? 0) >= 0.5) {
       const { x: hx, y: hy } = this.toCanvasCoords(landmarks[0].x, landmarks[0].y, canvasWidth, canvasHeight);
       this.ctx.strokeStyle = '#dd88ff';

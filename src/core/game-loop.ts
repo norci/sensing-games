@@ -1,7 +1,8 @@
 export class GameLoop {
   private running = false;
-  private onFrameCallback!: (time: number) => void;
+  private onFrameCallback!: (time: number, deltaTime: number) => void;
   private onDetectCallback!: () => void | Promise<void>;
+  private lastFrameTime = 0;
   private lastDetectTime = 0;
   private detectInterval: number;
   private detectInFlight = false;
@@ -20,7 +21,7 @@ export class GameLoop {
     this.running = false;
   }
 
-  onFrame(callback: (time: number) => void): void {
+  onFrame(callback: (time: number, deltaTime: number) => void): void {
     this.onFrameCallback = callback;
   }
 
@@ -36,7 +37,10 @@ export class GameLoop {
     if (!this.running) return;
     requestAnimationFrame(this.loop);
 
-    this.onFrameCallback(time);
+    const deltaTime = this.lastFrameTime === 0 ? 0 : time - this.lastFrameTime;
+    this.lastFrameTime = time;
+
+    this.onFrameCallback(time, deltaTime);
 
     if (time - this.lastDetectTime >= this.detectInterval) {
       if (this.detectInFlight) return;

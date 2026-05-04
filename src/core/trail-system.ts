@@ -80,7 +80,6 @@ export class TrailSystem {
       const colorPrefix = getColor(id);
       if (!colorPrefix || state.points.length < 2) continue;
 
-      // 限幅：超 maxPoints 时，滤除超时点
       if (state.points.length > this.config.maxPoints) {
         const cutoff = now - fadeTime;
         state.points = state.points.filter(p => p.createdAt >= cutoff);

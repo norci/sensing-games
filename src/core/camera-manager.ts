@@ -28,14 +28,13 @@ export class CameraManager {
     }
 
     try {
-      // 检测屏幕宽高比，使视频帧比例与屏幕一致
       const screenAspect = window.innerWidth / window.innerHeight;
       console.log(`屏幕宽高比: ${screenAspect.toFixed(3)}`);
 
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'user',
-          width: { ideal: 480 },
+          width: { ideal: 320 },
           aspectRatio: { ideal: screenAspect },
           frameRate: { ideal: 60, min: 30 },
         },
@@ -49,7 +48,6 @@ export class CameraManager {
           this.videoTrack = stream.getVideoTracks()[0];
           const settings = this.videoTrack.getSettings();
           console.log(`摄像头已启动: ${settings.width}x${settings.height} @ ${settings.frameRate}fps`);
-          // video 尺寸由 CSS 控制，此处不再设置
           resolve();
         };
       });

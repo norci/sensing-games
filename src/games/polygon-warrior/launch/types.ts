@@ -15,11 +15,11 @@ export interface LaunchParams {
 /** 发射策略接口 */
 export interface LaunchStrategy {
   name: string;
-  generate(canvasW: number, canvasH: number, speedMult: number): LaunchParams;
+  generate(canvasW: number, canvasH: number, speedMult: number, sides?: number): LaunchParams;
 }
 
 /** 发射模式 */
 export type LaunchMode = 'parabolic' | 'multi-direction';
 
-/** 发射方向 */
-export type LaunchDirection = 'bottom' | 'left' | 'right' | 'top';
+/** 发射方向（不含 top，多边形不从顶部落下）*/
+export type LaunchDirection = 'bottom' | 'left' | 'right';

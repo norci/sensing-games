@@ -12,7 +12,6 @@ import { PersonPresenceMonitor } from './core/presence-monitor.js';
 import { FilterManager } from './core/filter-manager.js';
 
 class GameApp {
-  // 核心模块
   private cameraMgr: CameraManager;
   private detector: PoseDetector;
   private filterManager: FilterManager;
@@ -25,7 +24,6 @@ class GameApp {
   private gameCanvas: HTMLCanvasElement;
   private presenceMonitor: PersonPresenceMonitor;
 
-  // 状态
   private latestFiltered: any[] | null = null;
   private prevRaw: any[] | null = null;
   private partConfigs: typeof DEFAULT_BODY_CONFIGS;
@@ -103,7 +101,7 @@ class GameApp {
         if (loading) loading.style.display = 'none';
         await this.initDetector();
         this.gameLoop = new GameLoop(1000 / this.cameraMgr.getFps());
-        this.gameLoop.onFrame(() => this.renderFrame());
+        this.gameLoop.onFrame((time, deltaTime) => this.renderFrame(deltaTime));
         this.gameLoop.onDetect(() => this.detectFrame());
         this.engine.start();
         this.gameLoop.start();
@@ -127,19 +125,15 @@ class GameApp {
         return;
       }
 
-      // worldLandmarks 可能为空（MediaPipe 偶发不返回）
       const rawWorld = result.worldLandmarks?.[0];
       const rawNorm = result.landmarks![0];
       if (!rawWorld) return;
 
-      // 滤波数据仅用于渲染（平滑）
       const filteredResult = this.filterManager.apply(result);
       this.latestFiltered = filteredResult.landmarks![0];
 
-      // 动作分析用原始数据
       const motionResult = this.analyzer.analyze(rawWorld, rawNorm);
 
-      // 火花方向用原始数据
       const w = window.innerWidth;
       const h = window.innerHeight;
       const prev = this.prevRaw;
@@ -185,9 +179,9 @@ class GameApp {
     this.detector.feedFrame(video);
   }
 
-  private renderFrame(): void {
+  private renderFrame(deltaTime: number): void {
     if (this.engine.getState() === GameState.PLAYING) {
-      this.game.tick();
+      this.game.tick(deltaTime);
     }
     this.game.render();
 
@@ -196,7 +190,7 @@ class GameApp {
       this.poseRenderer.renderPartHighlight(this.latestFiltered, window.innerWidth, window.innerHeight);
     }
 
-    this.sparkEffect.update();
+    this.sparkEffect.update(deltaTime);
     const ctx = this.gameCanvas.getContext('2d')!;
     this.sparkEffect.render(ctx);
 

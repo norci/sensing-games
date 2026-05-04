@@ -3,28 +3,16 @@
  */
 import { FilesetResolver } from '@mediapipe/tasks-vision';
 
-// Polyfill self.import for MediaPipe's WASM loader.
-// In ESM workers, importScripts() throws TypeError and MediaPipe falls back to
-// self.import() which doesn't exist. The loaded scripts are classic (sloppy-mode)
-// Emscripten outputs that:
-//   1. Declare `var ModuleFactory` (needs to become self.ModuleFactory)
-//   2. Use sloppy-mode function-in-block hoisting (breaks in strict/ES module mode)
-// We fetch the script, patch these issues, and import via blob: URL.
 if (typeof self !== 'undefined' && !('import' in self)) {
   (self as unknown as Record<string, unknown>).import = async (url: string) => {
     const response = await fetch(url);
     let text = await response.text();
 
-    // Fix sloppy-mode function-in-block: the Emscripten debug helper declares
-    // `function custom_dbg(text) {...}` inside an `if` block, which hoists to
-    // the enclosing function in sloppy mode but is block-scoped in strict mode.
-    // Rewrite to a strict-mode-safe variable assignment.
     text = text.replace(
       /if\s*\(\s*typeof\s*\(?\s*custom_dbg\s*\)?\s*===?\s*["']undefined["']\s*\)\s*\{\s*function\s+custom_dbg\s*\(\s*text\s*\)\s*\{/,
       "var custom_dbg; if (typeof custom_dbg === 'undefined') { custom_dbg = function(text) {"
     );
 
-    // Export ModuleFactory to the global scope (var is module-scoped under import())
     text += '\nself.ModuleFactory = ModuleFactory;\n';
 
     const blob = new Blob([text], { type: 'text/javascript' });
@@ -50,7 +38,6 @@ export abstract class PoseWorkerBase {
   }
 
   protected async handleMessage(event: MessageEvent) {
-    // 有消息在处理时，队列化其余消息
     if (this.isProcessing) {
       this.messageQueue.push(event);
       return;
@@ -59,7 +46,6 @@ export abstract class PoseWorkerBase {
     this.isProcessing = true;
     await this.doHandleMessage(event);
 
-    // 队列中按序取出下一条处理
     while (this.messageQueue.length > 0) {
       const next = this.messageQueue.shift()!;
       await this.doHandleMessage(next);

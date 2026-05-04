@@ -3,7 +3,6 @@ import { PolygonWarriorGame } from './polygon-warrior/index.js';
 
 export type { IGameMode };
 
-// 游戏模式注册表
 const gameModes: Record<string, new (...args: any[]) => IGameMode> = {
   'polygon-warrior': PolygonWarriorGame,
 };

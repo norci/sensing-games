@@ -16,12 +16,10 @@ export interface Circle {
   radius: number;
 }
 
-// 计算两点距离
 export function distance(p1: Point, p2: Point): number {
   return Math.hypot(p1.x - p2.x, p1.y - p2.y);
 }
 
-// 计算线段与圆的碰撞
 export function lineCircleIntersect(
   lineStart: Point,
   lineEnd: Point,
@@ -48,7 +46,6 @@ export function lineCircleIntersect(
   return (t1 >= 0 && t1 <= 1) || (t2 >= 0 && t2 <= 1);
 }
 
-// 归一化坐标转画布坐标
 export function normalizeToCanvas(
   normalized: Point,
   width: number,
@@ -60,17 +57,14 @@ export function normalizeToCanvas(
   };
 }
 
-// 随机范围
 export function randomRange(min: number, max: number): number {
   return Math.random() * (max - min) + min;
 }
 
-// 随机整数
 export function randomInt(min: number, max: number): number {
   return Math.floor(randomRange(min, max + 1));
 }
 
-// 计算点到线段的距离
 export function pointToLineDistance(
   point: Point,
   lineStart: Point,
@@ -80,13 +74,11 @@ export function pointToLineDistance(
   const dy = lineEnd.y - lineStart.y;
   const lenSq = dx * dx + dy * dy;
   
-  if (lenSq === 0) return distance(point, lineStart);  // 线段退化为点
-  
-  // 计算投影参数 t（线段上的位置）
+  if (lenSq === 0) return distance(point, lineStart);
+
   let t = ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / lenSq;
-  t = Math.max(0, Math.min(1, t));  // 钳制到 [0,1]
-  
-  // 计算投影点
+  t = Math.max(0, Math.min(1, t));
+
   const projX = lineStart.x + t * dx;
   const projY = lineStart.y + t * dy;
   

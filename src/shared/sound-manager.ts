@@ -11,7 +11,6 @@ export class SoundManager {
     }
   }
 
-  // 生成简单音效（无需外部文件）
   play(soundName: 'slice' | 'combo' | 'life_lost' | 'game_over'): void {
     if (this.isMuted || !this.audioContext) return;
 

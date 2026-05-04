@@ -1,6 +1,3 @@
-/** 通用粒子系统 - 合并火花与碎片特效 */
-
-// ==================== 火花粒子（肢体运动迸出） ====================
 interface Spark {
   x: number;
   y: number;
@@ -92,12 +89,12 @@ export class SparkEffect {
   }
 
   /** 更新火花状态，返回 false 表示无活跃火花 */
-  update(): boolean {
-    const dt = 1 / 60;
+  update(deltaTime: number): boolean {
+    const dt = deltaTime / 1000;
     let i = 0;
     while (i < this.sparks.length) {
       const s = this.sparks[i];
-      s.life -= dt * 1000;
+      s.life -= deltaTime;
       if (s.life <= 0) {
         this.sparks[i] = this.sparks[this.sparks.length - 1];
         this.sparks.pop();
@@ -134,7 +131,6 @@ export class SparkEffect {
   }
 }
 
-// ==================== 碎片粒子（水果爆炸） ====================
 export interface FragmentConfig {
   /** 粒子数量 */
   count?: number;
@@ -223,15 +219,16 @@ export class FragmentParticleSystem {
   }
 
   /** 每帧更新，返回是否还有活粒子 */
-  update(dt?: number): boolean {
+  update(deltaTime: number): boolean {
+    const dt = deltaTime / 16.67;
     const gravity = this.config.gravity;
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += gravity;
-      p.rotation += p.rotationSpeed;
-      p.life -= 16;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += gravity * dt;
+      p.rotation += p.rotationSpeed * dt;
+      p.life -= deltaTime;
 
       if (p.life <= 0) {
         this.particles.splice(i, 1);

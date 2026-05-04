@@ -1,5 +1,5 @@
 import { IGameMode, MotionResult, Point } from '../../core/types.js';
-import { Shape } from './shape.js';
+import { Shape, rollSides } from './shape.js';
 import { SlicingSystem } from './slicing.js';
 import { GameEngine } from '../../core/game-engine.js';
 import { DifficultyManager } from '../../core/difficulty-manager.js';
@@ -40,7 +40,7 @@ export class PolygonWarriorGame implements IGameMode {
     this.canvas.height = window.innerHeight;
   }
 
-  updatePhysics(): void {
+  updatePhysics(deltaTime: number): void {
     const now = Date.now();
 
     this.difficultyMgr.sample(this.shapes.length);
@@ -56,7 +56,7 @@ export class PolygonWarriorGame implements IGameMode {
 
     for (let i = this.shapes.length - 1; i >= 0; i--) {
       const shape = this.shapes[i];
-      shape.update();
+      shape.update(deltaTime);
 
       if ((shape.isMissed && !shape.isSliced) || shape.isSliced) {
         this.shapes.splice(i, 1);
@@ -77,16 +77,15 @@ export class PolygonWarriorGame implements IGameMode {
 
   private handleShapeSliced(shape: Shape): void {
     if (shape.isBomb()) {
-      // 击中炸弹：扣一半积分 + 屏幕变暗
-      this.gameEngine.setScore(Math.floor(this.gameEngine.getScore() / 2));
+      this.gameEngine.setScore(Math.floor(this.gameEngine.getScore() * 0.8));
       this.bombHitTime = Date.now();
       this.particleSystem.emit(shape.x, shape.y, '#FFFFFF', { count: 24 });
     } else if (shape.hasSpecialEffect()) {
       if (shape.config.kind === 'freeze') {
         const effect = new FreezeEffect();
-        this.gameEngine.setSpeedMultiplier(0.3);
+        this.gameEngine.setSpeedMultiplier(0.1);
         setTimeout(() => {
-          this.gameEngine.setSpeedMultiplier(1.0);
+          this.gameEngine.setSpeedMultiplier(5.0);
         }, effect.duration);
         this.particleSystem.emit(shape.x, shape.y, '#00BFFF', { count: 16 });
       }
@@ -106,9 +105,9 @@ export class PolygonWarriorGame implements IGameMode {
     }
   }
 
-  tick(): void {
-    this.updatePhysics();
-    this.particleSystem.update();
+  tick(deltaTime: number): void {
+    this.updatePhysics(deltaTime);
+    this.particleSystem.update(deltaTime);
   }
 
   render(ctx?: CanvasRenderingContext2D, gl?: WebGL2RenderingContext): void {
@@ -121,7 +120,6 @@ export class PolygonWarriorGame implements IGameMode {
     this.particleSystem.render(context);
     this.renderHUD(context);
 
-    // 炸弹击中效果：屏幕变暗1秒
     const timeSinceBombHit = Date.now() - this.bombHitTime;
     if (timeSinceBombHit < 1000) {
       const opacity = 0.6 * (1 - timeSinceBombHit / 1000);
@@ -131,13 +129,15 @@ export class PolygonWarriorGame implements IGameMode {
   }
 
   private spawnShape(speedMultiplier: number): void {
+    const sides = rollSides();
     const launchParams = this.launchStrategy.generate(
       this.canvas.width,
       this.canvas.height,
-      speedMultiplier
+      speedMultiplier,
+      sides
     );
 
-    const shape = new Shape(launchParams, this.canvas.width, this.canvas.height);
+    const shape = new Shape(launchParams, this.canvas.width, this.canvas.height, sides);
     this.shapes.push(shape);
   }
 

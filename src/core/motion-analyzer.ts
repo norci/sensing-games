@@ -11,7 +11,6 @@ interface PartState {
 
 /** 估算头顶坐标（鼻子 + 肩膀向量延伸） */
 export function estimateTopOfHead(landmarks: any[]): Point {
-  // 直接用鼻尖（landmark 0），非估算头顶
   const nose = landmarks[0];
   return { x: nose.x, y: nose.y };
 }
@@ -81,7 +80,6 @@ export class MotionAnalyzer {
     topHeadWorld: Point | null,
     topHeadNorm: Point | null,
   ): BodyPartResult {
-    // --- landmarks (world = meters, norm = [0,1]) ---
     const tipW = worldLandmarks[cfg.tipIdx];
     const midW = worldLandmarks[cfg.midIdx];
     const rootW = worldLandmarks[cfg.rootIdx];
@@ -89,24 +87,20 @@ export class MotionAnalyzer {
     const midN = normLandmarks[cfg.midIdx];
     const rootN = normLandmarks[cfg.rootIdx];
 
-    // visibility 唯 normLandmarks 有之，worldLandmarks 无此字段
     const visOk = (lm: any) => !lm || (lm.visibility ?? 0) >= 0.5;
     if (!tipW || !midW || !rootW || !visOk(tipN) || !visOk(midN) || !visOk(rootN)) {
       return this.emptyPartResult(cfg.id);
     }
 
-    // --- rendering position: use normalized coords ---
     const tipPos = (cfg.isHead && topHeadNorm)
       ? topHeadNorm
       : { x: tipN.x, y: tipN.y };
 
-    // --- velocity: use world coords (meters) ---
     const dx = (tipW.x ?? 0) - (cfg.isHead ? 0 : rootW.x ?? 0);
     const dy = (tipW.y ?? 0) - (cfg.isHead ? 0 : rootW.y ?? 0);
     const dz = (tipW.z ?? 0) - (cfg.isHead ? 0 : rootW.z ?? 0);
     const velocity = this.calcVelocity(dx, dy, dz, cfg.id);
 
-    // --- angle: use normalized coords (unit-less) ---
     const angle = this.calcAngle(rootN, midN, tipN);
 
     const state = this.states.get(cfg.id)!;
