@@ -12,7 +12,7 @@ export function calcLaunchVelocity(
   speedMult: number,
   sides: number,
 ): { vx: number; vy: number } {
-    const v0 = getSidesSpeedMultiplier(sides) * randomRange(1, 2) * speedMult;
+    const v0 = getSidesSpeedMultiplier(sides) * randomRange(1, 2) * speedMult * 0.5;
 
   switch (direction) {
     case 'left':

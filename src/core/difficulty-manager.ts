@@ -23,8 +23,8 @@ const DEFAULT_DIFFICULTY_CONFIG: DifficultyConfig = {
   step: 0.05,
   checkInterval: 8000,
   targetOnScreen: 3,
-  spawnIntervalMax: 3000,
-  spawnIntervalMin: 600,
+  spawnIntervalMax: 1500,
+  spawnIntervalMin: 300,
   speedMin: 0.8,
   speedMax: 1.8,
 };
